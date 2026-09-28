@@ -186,7 +186,7 @@ void ShoutoutDock::build(){
     s->addWidget(label(t("language"),"section"));languages=new QComboBox;languages->setObjectName("language");
     languages->addItem("Українська","uk-UA");languages->addItem("Русский","ru-RU");languages->addItem("English","en-US");languages->setCurrentIndex(languages->findData(language));s->addWidget(languages);
     connect(languages,&QComboBox::currentIndexChanged,this,[this](int index){if(!painting)command("language",{{"value",languages->itemData(index).toString()}});});
-    s->addSpacing(8);versionLabel=label("Shoutout Desk OBS 0.1.3","muted");s->addWidget(versionLabel);
+    s->addSpacing(8);versionLabel=label("Shoutout Desk OBS","muted");s->addWidget(versionLabel);
     auto update=button(t("checkUpdate"),"refresh-cw");s->addWidget(update);
     connect(update,&QPushButton::clicked,this,[this,update]{update->setEnabled(false);QPointer<QPushButton> guard(update);command("update",{},[this,guard](QJsonValue v){if(guard)guard->setEnabled(true);auto r=v.toObject();if(r.value("available").toBool()){if(QMessageBox::question(this,t("update"),t("updateAvailable").arg(r.value("version").toString()))==QMessageBox::Yes)openUrl(r.value("url").toString());}else QMessageBox::information(this,t("update"),t("upToDate"));});QTimer::singleShot(15000,update,[update]{update->setEnabled(true);});});
     s->addStretch();tabs->addTab(scrollArea(settings),icon("settings-2"),t("settings"));

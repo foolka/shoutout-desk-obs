@@ -21,6 +21,17 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run package
+      - name: Install pinned Inno Setup compiler
+        shell: pwsh
+        run: |
+          $file = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $file
+          if ((Get-FileHash $file -Algorithm SHA256).Hash -ne '9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732') { throw 'Inno Setup checksum mismatch' }
+          $dir = Join-Path $env:RUNNER_TEMP 'inno'
+          $process = Start-Process $file -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/NOICONS', '/TASKS=""', "/DIR=`"$dir`"") -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Inno Setup installation failed' }
+          "ISCC_EXE=$dir\ISCC.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - run: npm run installer
       - name: Archive
         shell: pwsh
         run: |
@@ -33,5 +44,6 @@ jobs:
           name: shoutout-desk-obs-windows-x64
           path: |
             release/*.zip
+            release/*-setup.exe
             release/*.sha256
           if-no-files-found: error

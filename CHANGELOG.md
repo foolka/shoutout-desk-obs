@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4 - 2026-09-28
+
+- Add a self-contained Windows EXE installer in English, Ukrainian and Russian.
+- Detect OBS, check OBS/Qt compatibility, and block installation/removal while OBS is running without closing it automatically.
+- Support in-place upgrades and Windows uninstallation while retaining local people, history, cooldowns and encrypted sign-in.
+- Verify the complete package manifest before compiling the installer and publish separate SHA-256 checksums.
+- Document EXE installation, updates and removal in all three READMEs; keep ZIP installation available.
+
 ## 0.1.3 - 2026-09-28
 
 - Toggle the panel between docked and floating instead of only docking it.

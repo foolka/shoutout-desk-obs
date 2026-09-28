@@ -12,13 +12,15 @@ A local Twitch auto-shoutout plugin with a compact, dark OBS Studio dock. Add st
 
 ## Install
 
-1. Download the Windows x64 ZIP from [Releases](https://github.com/foolka/shoutout-desk-obs/releases) and extract the entire archive.
-2. Close OBS completely. Run `Install.cmd`; run it as administrator if Windows denies access to ProgramData.
+1. Download `shoutout-desk-obs-VERSION-windows-x64-setup.exe` from [Releases](https://github.com/foolka/shoutout-desk-obs/releases).
+2. Close OBS completely and run the EXE. Choose English, Ukrainian or Russian, approve the Windows administrator prompt, confirm the detected OBS folder and click Install.
 3. Open OBS → **Docks → Shoutout Desk**. Dock or float the panel wherever you prefer.
 
 The button next to Reconnect switches between **Undock from OBS** (arrow icon) and **Dock in OBS** (panel icon). It works even when dock dragging is locked and returns to the previous dock area, or the right side if none is available. To drag panels manually, turn off **Docks → Lock Docks**. Other docks are not unlocked by the plugin.
 
-The installer checks package SHA-256 hashes and installs only `C:\ProgramData\obs-studio\plugins\shoutout-desk-obs`. It does not replace OBS/Qt DLLs, scenes, sources, profiles, or stream settings. This preview installer targets a standard OBS installation, not portable mode.
+The EXE contains all plugin dependencies; users do not need Node.js, Streamer.bot or developer tools. It checks the OBS/Qt versions and refuses installation or removal while OBS is running. It never closes OBS, starts a stream, launches OBS or reboots the computer. It installs only into `C:\ProgramData\obs-studio\plugins\shoutout-desk-obs` and adds a Windows uninstall entry. OBS/Qt libraries, scenes, sources and stream settings are not replaced. Portable OBS is not supported. Twitch sign-in happens separately inside OBS, not in the installer.
+
+The full ZIP with `Install.cmd` remains available as an alternative. Extract the whole archive, close OBS and run `Install.cmd` (as administrator if required). It verifies package SHA-256 hashes before copying files.
 
 ## Setup
 
@@ -36,10 +38,11 @@ Permissions: `user:read:chat` and `moderator:manage:shoutouts`. The latter is Tw
 
 **Reset all cooldowns** asks for confirmation (No by default). Both resets preserve people and history, cancel pending requests and require a new chat message. Twitch's own rate limits and the global safety gap remain. Neither reset starts a broadcast or immediately sends shoutouts.
 
-- Click **Settings → Check for updates**, download and extract the new full ZIP, close OBS and run the new `Install.cmd`. Never replace just the DLL.
+- Click **Settings → Check for updates**, download the new setup EXE, close OBS and run it over the existing version. Do not uninstall first. The ZIP alternative also works; never replace just the DLL.
 - Data lives separately in `%LOCALAPPDATA%\Shoutout Desk OBS`. Updating or reinstalling plugin files does not erase it.
 - Before opening an existing database with a new plugin version, a consistent SQLite backup (including WAL) and encrypted sign-in backup are saved under `backups`. If backup fails, startup stops.
-- Previous installed plugin files are kept under `%PROGRAMDATA%\ShoutoutDeskOBS-install-backups`. Use the matching data backup when rolling back across a future database migration.
+- The ZIP installer keeps previous plugin files under `%PROGRAMDATA%\ShoutoutDeskOBS-install-backups`. The EXE uses the standard Windows installer/uninstaller instead. Keep the matching data backup when rolling back across a future database migration.
+- To remove an EXE installation, close OBS and uninstall **Shoutout Desk OBS** from Windows Installed apps. Personal data, including saved sign-in, is deliberately retained for reinstallation. Sign out in the plugin before uninstalling if you do not want to retain the active token; to revoke backups too, use Twitch Connections.
 - **Import / Export** transfers lists, history and cooldowns, never OAuth tokens. Import can read a Shoutout Desk desktop `shoutouts.sqlite` from the same account, including history previously imported from Voice. It creates a backup, merges rather than deletes, and pauses automation until you enable it or restart OBS. Close the desktop app first.
 - **Sign out** forgets the active local sign-in. To invalidate all copies (including backups), disconnect the application in [Twitch Connections](https://www.twitch.tv/settings/connections).
 
@@ -49,7 +52,7 @@ Twitch tokens are protected with Windows DPAPI for the current Windows user. The
 
 The queue respects a 125-second global gap, your per-person cooldown, external official shoutouts, a 10-second settling window and duplicate chat events. Old pending messages are cancelled after restart; an unconfirmed send is not blindly retried. Lost Twitch events or simultaneous independent bots mean absolute prevention of duplicates cannot be guaranteed. A plain bot chat link is not an official shoutout event.
 
-No updates are installed automatically. Update checks contact GitHub only when clicked and do not include Twitch tokens. Archives are not Authenticode-signed; SHA-256 checks detect corruption, not publisher identity. Obtain releases only from this repository.
+No updates are installed automatically. Update checks contact GitHub only when clicked and do not include Twitch tokens. Setup EXEs and archives are not Authenticode-signed; Windows may display an unknown-publisher warning. SHA-256 checks detect corruption, not publisher identity. Obtain releases only from this repository.
 
 ## Development
 
@@ -60,9 +63,14 @@ npm ci --ignore-scripts
 npm run build
 npm test
 npm run package
+npm run installer
 ```
 
 The build script downloads a pinned SHA-256-verified official OBS Qt SDK. `QT_SDK` and `CMAKE_EXE` can override local tool paths. Packaging includes a checksum-verified Node 24.14.0 runtime and production dependencies. `shoutout-preview.exe <packaged-plugin-data-directory> <screenshots-directory>` runs an offline preview using temporary data, never sends a Twitch request, and exits after screenshots. Point `PATH`/`QT_PLUGIN_PATH` to your OBS Qt runtime to launch it.
+
+EXE builds require [Inno Setup 6.7.3 or newer](https://jrsoftware.org/isdl.php); set `ISCC_EXE` for a nonstandard compiler location. The builder verifies every payload hash, rejects unlisted/private files and emits an EXE plus `.sha256`. CI downloads a pinned, checksum-verified compiler. `tools/installer.iss` has a compile-time `TestRoot` option for isolated, non-admin installation/removal tests; this is not enabled in public builds and cannot be selected by a command-line switch at install time. Public installation requires the standard plugin path, even with `/DIR`. `/OBSROOT=` can select a nonstandard OBS installation for scripted testing.
+
+Run `tools/test-installer.ps1 -Compiler <ISCC.exe> -ObsRoot <OBS-folder>` with OBS closed to check fresh install, in-place repair and uninstall in a unique `.test-data` directory. Add `-PreviousPackage <old-unpacked-ZIP>` to check upgrading a legacy ZIP installation. `-ExpectBlocked` instead checks that an open OBS blocks installation without writing plugin files. These tests never install into the live OBS folder, register an uninstaller in Windows, open a personal profile, launch OBS or send Twitch requests.
 
 The native dock uses the public OBS frontend C ABI and Qt Widgets; the worker uses Twurple and SQLite. See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and [third-party notices](THIRD_PARTY_NOTICES.md). GPL-2.0-or-later. Not affiliated with Twitch or OBS Project.
 
