@@ -17,6 +17,8 @@ async function main() {
   const demo=args.includes('--offline-demo');
   await prepareProfile(dir,VERSION);
   const store=new Store(path.join(dir,'shoutouts.sqlite'));
+  // The checkbox pauses only this OBS session; startup never resets cooldowns.
+  store.setPrefs({enabled:true});
   const secrets=vault(path.join(dir,'twitch-auth.dpapi'),helper);
   const pendingSecrets=vault(path.join(dir,'twitch-login.dpapi'),helper);
   let saved=null,notice='',bridge=null,engine=null,closing=false,refreshing=false,generation=0;
@@ -61,7 +63,7 @@ async function main() {
     current.on('changed',changed);
     void current.connect();changed();
   }
-  auth.on('change',changed);auth.on('authorized',()=>{store.setPrefs({enabled:false});connect();});
+  auth.on('change',changed);auth.on('authorized',()=>{store.setPrefs({enabled:true});connect();});
   auth.on('expired',()=>{disconnect();notice=auth.message;changed();});
   const commands={
     state:async()=>state(),

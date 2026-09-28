@@ -23,7 +23,7 @@ The installer checks package SHA-256 hashes and installs only `C:\ProgramData\ob
 ## Setup
 
 1. Open **Settings → Sign in with Twitch**. Enter the displayed code at the official Twitch activation page and authorize **your broadcaster account**.
-2. Add Twitch names or channel links in **People**, set the per-person cooldown (1–168 hours), then enable auto-shoutouts.
+2. Add Twitch names or channel links in **People** and set the per-person cooldown (1–168 hours). Auto-shoutouts are enabled on every OBS launch and after a new sign-in. Unchecking **Enabled** pauses them for the current session; the next launch enables them again without resetting cooldowns.
 3. The plugin listens while OBS is open. Shoutouts are sent only while Twitch reports your channel live. Hiding the dock does not stop the worker; closing OBS does.
 
 The public build includes a shared **Public Client ID**. No client secret is needed. Fork maintainers must register their own application in [Twitch Developer Console](https://dev.twitch.tv/console/apps), select **Public / Chat Bot**, add `http://localhost` as the required redirect placeholder (device login does not use it), and replace `data/twitch-client.json`. Do not share one client ID between different applications.
@@ -40,7 +40,7 @@ Permissions: `user:read:chat` and `moderator:manage:shoutouts`. The latter is Tw
 - Data lives separately in `%LOCALAPPDATA%\Shoutout Desk OBS`. Updating or reinstalling plugin files does not erase it.
 - Before opening an existing database with a new plugin version, a consistent SQLite backup (including WAL) and encrypted sign-in backup are saved under `backups`. If backup fails, startup stops.
 - Previous installed plugin files are kept under `%PROGRAMDATA%\ShoutoutDeskOBS-install-backups`. Use the matching data backup when rolling back across a future database migration.
-- **Import / Export** transfers lists, history and cooldowns, never OAuth tokens. Import can read a Shoutout Desk desktop `shoutouts.sqlite` from the same account, creates a backup, merges rather than deletes, and leaves automation paused. Close the desktop app first.
+- **Import / Export** transfers lists, history and cooldowns, never OAuth tokens. Import can read a Shoutout Desk desktop `shoutouts.sqlite` from the same account, including history previously imported from Voice. It creates a backup, merges rather than deletes, and pauses automation until you enable it or restart OBS. Close the desktop app first.
 - **Sign out** forgets the active local sign-in. To invalidate all copies (including backups), disconnect the application in [Twitch Connections](https://www.twitch.tv/settings/connections).
 
 ## Reliability And Privacy

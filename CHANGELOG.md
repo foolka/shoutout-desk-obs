@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 - 2026-09-28
+
+- Accept legacy Voice history IDs when importing a desktop database, without losing records or cooldowns.
+- Preserve cooldown reset markers when importing SQLite as well as JSON.
+- Enable auto-shoutouts on every OBS launch and after sign-in; manual pause lasts until the next launch.
+- Keep cooldowns and require fresh chat messages after launch; imports still pause the current session.
+
 ## 0.1.1 - 2026-09-28
 
 - Show sign-in restoration during startup instead of briefly offering a new login.

@@ -21,6 +21,7 @@ function readDesktop(file) {
     return {
       format:'shoutout-desk-obs', version:1, account,
       cooldownHours:JSON.parse(db.prepare("SELECT value FROM preferences WHERE key='cooldownHours'").get()?.value || '24'),
+      cooldownResetAt:JSON.parse(db.prepare('SELECT value FROM preferences WHERE key=?').get('cooldownReset:'+account.id)?.value || '0'),
       people:db.prepare('SELECT login,added_at,active FROM channel_people WHERE account=?').all(account.id),
       attempts:db.prepare('SELECT * FROM attempts WHERE account=?').all(account.id),
       observed:db.prepare('SELECT login,stamp FROM observed_shoutouts WHERE account=?').all(account.id)
@@ -38,7 +39,8 @@ function importBundle(store, value, account) {
   }
   const people = value.people.map(p=>({login:normalizeLogin(p.login), added_at:stamp(p.added_at), active:p.active===1?1:0}));
   const attempts = value.attempts.map(a=>{
-    if (a.account!==account || !/^[a-zA-Z0-9-]{1,80}$/.test(a.id)) throw Error('Некорректная история.');
+    // Legacy Voice imports use voice:account:login:timestamp IDs.
+    if (a.account!==account || typeof a.id!=='string' || !/^[a-zA-Z0-9_:-]{1,128}$/.test(a.id)) throw Error('Некорректная история.');
     if (!['sent','failed','uncertain','cancelled','sending','queued'].includes(a.status)) throw Error('Некорректный статус.');
     if((a.status==='sent'&&a.finished_at==null)||(['sending','uncertain'].includes(a.status)&&a.started_at==null))throw Error('В истории отсутствует время отметки.');
     return {...a, login:normalizeLogin(a.login), created_at:stamp(a.created_at), started_at:a.started_at==null?null:stamp(a.started_at),

@@ -8,8 +8,8 @@ const {prepareProfile,backupProfile,vault}=require('../core/vault.cjs');
 const {checkUpdate,newer}=require('../core/update.cjs');
 function fixture(t){const s=new Store(':memory:');s.rememberAccount('123','sample');s.setPrefs({enabled:true});t.after(()=>s.close());return s;}
 function temp(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'obs-shoutout-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return dir;}
-test('plugin defaults to paused and excludes desktop provider/moderator settings',()=>{
-  const s=new Store(':memory:');assert.deepEqual(s.prefs(),{cooldownHours:24,enabled:false,resetAfterLongClose:false});
+test('plugin defaults to enabled and excludes desktop provider/moderator settings',()=>{
+  const s=new Store(':memory:');assert.deepEqual(s.prefs(),{cooldownHours:24,enabled:true,resetAfterLongClose:false});
   for(const key of ['role','provider','startInTray'])assert.throws(()=>s.setPrefs({[key]:'anything'}));s.close();
 });
 
@@ -40,6 +40,34 @@ test('foreign account, malformed history and future timestamps leave database un
 test('desktop import is read-only and never reads the desktop auth file',t=>{
   const dir=temp(t),file=path.join(dir,'desktop.sqlite');let s=new Store(file);s.rememberAccount('123','sample');s.add('someone');s.close();
   const before=fs.readFileSync(file),bundle=readDesktop(file);assert.equal(bundle.people[0].login,'someone');assert.deepEqual(fs.readFileSync(file),before);
+});
+
+test('desktop Voice history IDs import intact and repeated import is idempotent',t=>{
+  const file=path.join(temp(t),'desktop.sqlite'),source=new Store(file),target=fixture(t),stamp=Date.now()-3600000;
+  source.rememberAccount('123','sample');source.add('old_friend');source.setPrefs({cooldownHours:14});
+  const id=`voice:123:old_friend:${stamp}`;
+  source.db.prepare('INSERT INTO attempts(id,account,login,created_at,started_at,finished_at,status,detail) VALUES(?,?,?,?,?,?,?,?)')
+    .run(id,'123','old_friend',stamp,stamp,stamp,'sent','Imported from Voice');
+  source.close();const before=fs.readFileSync(file),bundle=readDesktop(file);
+  for(let i=0;i<2;i++)assert.deepEqual(importBundle(target,bundle,'123'),{people:1,history:1});
+  assert.equal(target.people('123').length,1);assert.equal(target.history('123').length,1);
+  assert.equal(target.history('123')[0].id,id);assert.equal(target.last('123','old_friend'),stamp);
+  assert.equal(target.prefs().cooldownHours,14);assert.deepEqual(fs.readFileSync(file),before);
+});
+
+test('history IDs reject malformed values without a partial import',t=>{
+  const source=fixture(t),target=fixture(t);source.add('person');const bundle=exportBundle(source,'123'),stamp=Date.now()-1000;
+  for(const id of [null,123,'','x'.repeat(129),'bad/id','bad\nvalue',"bad';--"]){
+    assert.throws(()=>importBundle(target,{...bundle,attempts:[{id,account:'123',login:'person',status:'sent',created_at:stamp,started_at:stamp,finished_at:stamp}]},'123'));
+    assert.equal(target.people('123').length,0);assert.equal(target.history('123').length,0);
+  }
+});
+
+test('SQLite import preserves the plugin cooldown reset cutoff',t=>{
+  const file=path.join(temp(t),'plugin.sqlite'),source=new Store(file),target=fixture(t);
+  source.rememberAccount('123','sample');source.add('person');source.observeShoutout('123','person',Date.now()-1000);source.resetCooldowns();
+  const cutoff=source.cooldownResetAt('123');source.close();
+  importBundle(target,readDesktop(file),'123');assert.equal(target.cooldownResetAt('123'),cutoff);assert.equal(target.last('123','person'),null);
 });
 test('version backup captures SQLite WAL before writable migrations, once per version',async t=>{
   const dir=temp(t);await prepareProfile(dir,'0.1.0');const s=new Store(path.join(dir,'shoutouts.sqlite'));s.rememberAccount('123','sample');s.add('person');

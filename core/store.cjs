@@ -54,7 +54,7 @@ class Store {
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   prefs() {
-    const out = { cooldownHours: 24, enabled: false, resetAfterLongClose: false };
+    const out = { cooldownHours: 24, enabled: true, resetAfterLongClose: false };
     for (const row of this.db.prepare('SELECT * FROM preferences').all()) {
       if (Object.hasOwn(out, row.key)) out[row.key] = JSON.parse(row.value);
     }

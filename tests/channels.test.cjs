@@ -20,7 +20,7 @@ test('observed external shoutout cancels queue and shares per-channel cooldown',
   store.observeShoutout('a','viewer',now);assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM observed_shoutouts').get().n,1);
 });
 test('settings validation is atomic',t=>{
-  const store=new Store(':memory:');t.after(()=>store.close());assert.throws(()=>store.setPrefs({cooldownHours:14,enabled:'invalid'}));assert.equal(store.prefs().cooldownHours,24);assert.equal(store.prefs().enabled,false);
+  const store=new Store(':memory:');t.after(()=>store.close());assert.throws(()=>store.setPrefs({cooldownHours:14,enabled:'invalid'}));assert.equal(store.prefs().cooldownHours,24);assert.equal(store.prefs().enabled,true);
 });
 test('stopped engine cannot write late responses into a closed database',async()=>{
   const store=new Store(':memory:');store.add('viewer');let resolve;const engine=new Engine(store,{call:()=>new Promise(r=>resolve=r)});const pending=engine.connect();engine.stop();store.close();resolve({status:'ok',account:'a',live:true});await pending;
