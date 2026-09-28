@@ -37,6 +37,26 @@ test('device login stores credentials but never exposes tokens or device code to
   await auth.poll();assert.equal(writes.length,1);assert.equal(auth.view().user.login,'owner');assert.equal(auth.view().pending,null);
   assert.ok(!JSON.stringify(auth.view()).includes('private'));
 });
+
+test('an unfinished device login survives disposal and resumes after restart without another browser login',async t=>{
+  const f=authFixture(t);let diskPending=null,diskAuth=null;
+  f.auth.savePending=value=>{diskPending=structuredClone(value);};
+  await f.auth.start(CLIENT);assert.ok(diskPending.deviceCode);f.auth.dispose();assert.ok(diskPending);
+  const next=new TwitchAuth({pending:diskPending,savePending:v=>{diskPending=v;},save:v=>{diskAuth=v;},sdk:async()=>f.sdk,now:f.auth.now});
+  t.after(()=>next.dispose());assert.ok(!JSON.stringify(next.view()).includes('private-device'));
+  await next.poll();assert.equal(next.view().user.login,'owner');assert.equal(diskPending,null);assert.ok(diskAuth.token);
+  const third=new TwitchAuth({saved:diskAuth,save:()=>{}});assert.equal(third.view().user.login,'owner');third.dispose();
+});
+
+test('expired or foreign pending login cannot resume and cancellation forgets it',async t=>{
+  const f=authFixture(t);let pending;
+  f.auth.savePending=value=>{pending=structuredClone(value);};await f.auth.start(CLIENT);const original=pending;
+  f.auth.cancel();assert.equal(pending,null);
+  for(const bad of [{...original,expiresAt:1},{...original,url:'https://invalid.example/activate'}]){
+    let cleared=false;const auth=new TwitchAuth({pending:bad,save:()=>{},savePending:v=>{cleared=v===null;},now:f.auth.now});
+    assert.equal(auth.pending,null);assert.equal(cleared,true);auth.dispose();
+  }
+});
 test('pending and slow-down keep polling; expired device code stops',async t=>{
   let message='authorization_pending';const {auth,advance}=authFixture(t,{exchangeDeviceCode:async()=>{throw {statusCode:400,body:{message}};}});
   await auth.start(CLIENT);await auth.poll();assert.ok(auth.pending);message='slow_down';await auth.poll();assert.equal(auth.pending.interval,10000);

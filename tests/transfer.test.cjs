@@ -9,7 +9,7 @@ const {checkUpdate,newer}=require('../core/update.cjs');
 function fixture(t){const s=new Store(':memory:');s.rememberAccount('123','sample');s.setPrefs({enabled:true});t.after(()=>s.close());return s;}
 function temp(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'obs-shoutout-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return dir;}
 test('plugin defaults to paused and excludes desktop provider/moderator settings',()=>{
-  const s=new Store(':memory:');assert.deepEqual(s.prefs(),{cooldownHours:24,enabled:false});
+  const s=new Store(':memory:');assert.deepEqual(s.prefs(),{cooldownHours:24,enabled:false,resetAfterLongClose:false});
   for(const key of ['role','provider','startInTray'])assert.throws(()=>s.setPrefs({[key]:'anything'}));s.close();
 });
 

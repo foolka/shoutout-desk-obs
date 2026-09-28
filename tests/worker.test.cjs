@@ -19,6 +19,9 @@ test('real worker IPC starts offline, accepts edits, exports no tokens, and exit
   await request('add',{login:'another_person'});state=await request('state');assert.ok(state.people.some(p=>p.login==='another_person'));
   await request('remove',{login:'another_person'});state=await request('state');assert.ok(!state.people.some(p=>p.login==='another_person'));
   await request('prefs',{cooldownHours:14});assert.equal((await request('state')).prefs.cooldownHours,14);
+  await request('prefs',{resetAfterLongClose:true});assert.equal((await request('state')).prefs.resetAfterLongClose,true);
+  const before=(await request('state')).people;assert.ok(before.find(p=>p.login==='riverstudio').nextAt>0);
+  await request('resetCooldowns');assert.equal((await request('state')).people.find(p=>p.login==='riverstudio').nextAt,0);
   await assert.rejects(request('prefs',{role:'moderator'}));await assert.rejects(request('login'));
   const file=path.join(dir,'export.json');await request('export',{path:file});assert.ok(!fs.readFileSync(file,'utf8').includes('accessToken'));
   const exit=once(child,'exit');child.stdin.end();const [code]=await exit;assert.equal(code,0);

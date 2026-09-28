@@ -15,16 +15,29 @@ function safeError(error){
 function publicError(message){return Object.assign(Error(message),{publicMessage:message});}
 function verificationUrl(value){const url=new URL(value);if(url.origin!=='https://www.twitch.tv'||url.pathname!=='/activate')throw publicError('Twitch вернул неизвестный адрес входа.');return url.href;}
 class TwitchAuth extends EventEmitter {
-  constructor({saved=null,save,sdk=loadSdk,now=Date.now}){super();this.saved=saved;this.save=save;this.sdk=sdk;this.now=now;this.serial=0;this.authGeneration=0;this.pending=null;this.message='';}
+  constructor({saved=null,save,pending=null,savePending=()=>{},sdk=loadSdk,now=Date.now}){
+    super();this.saved=saved;this.save=save;this.savePending=savePending;this.sdk=sdk;this.now=now;this.serial=0;this.authGeneration=0;this.pending=null;this.message='';
+    if(!saved&&pending){
+      try{
+        if(typeof pending.deviceCode!=='string'||!pending.deviceCode||typeof pending.userCode!=='string'||
+          !Number.isSafeInteger(pending.expiresAt)||pending.expiresAt<=now()||pending.expiresAt>now()+86400000)throw Error('Expired pending login');
+        this.pending={...pending,clientId:clientId(pending.clientId),url:verificationUrl(pending.url),interval:Math.max(5000,Math.min(60000,Number(pending.interval)||5000))};
+        this.message='Продолжаем сохранённый вход Twitch';
+      }catch{try{savePending(null);}catch{}this.message='Незавершённый вход истёк. Войдите через Twitch.';}
+    }
+  }
   view(){return {user:this.saved?.user||null,pending:this.pending?{code:this.pending.userCode,url:this.pending.url,expiresAt:this.pending.expiresAt}:null,message:this.message};}
   persist(value){try{this.save(value);}catch{throw publicError('Не удалось сохранить вход в защищённом хранилище Windows. Повторите авторизацию.');}}
   invalidate(message){this.invalid=true;this.message=message;this.emit('expired');this.emit('change');}
-  cancel(){this.serial++;clearTimeout(this.timer);this.pending=null;this.emit('change');}
+  cancel(){this.serial++;clearTimeout(this.timer);this.pending=null;try{this.savePending(null);}catch{}this.emit('change');}
+  resume(){if(this.pending){const generation=this.serial;this.timer=setTimeout(()=>void this.poll(generation),0);this.timer.unref?.();}}
   async start(id){
     this.cancel();const generation=this.serial;id=clientId(id);this.message='Получаем код Twitch';this.emit('change');
     const sdk=await this.sdk();const info=await sdk.startDeviceCodeFlow(id,SCOPES);
     if(generation!==this.serial)return;
-    this.pending={...info,clientId:id,url:verificationUrl(info.verificationUri),expiresAt:this.now()+info.expiresIn*1000,interval:Math.max(5,info.interval||5)*1000};
+    const pending={...info,clientId:id,url:verificationUrl(info.verificationUri),expiresAt:this.now()+info.expiresIn*1000,interval:Math.max(5,info.interval||5)*1000};
+    try{this.savePending(pending);}catch{throw publicError('Не удалось сохранить незавершённый вход. Проверьте защищённое хранилище Windows.');}
+    this.pending=pending;
     this.message='Разрешите доступ в браузере';this.emit('change');this.schedule(generation);return this.view();
   }
   schedule(generation){clearTimeout(this.timer);this.timer=setTimeout(()=>void this.poll(generation),this.pending.interval);this.timer.unref?.();}
@@ -40,13 +53,14 @@ class TwitchAuth extends EventEmitter {
       if(info.clientId!==pending.clientId||!info.userId||SCOPES.some(scope=>!info.scopes.includes(scope)))throw publicError('Разрешены не все нужные права. Повторите вход.');
       const saved={clientId:pending.clientId,user:{id:info.userId,login:info.userName},token:{...token,scope:info.scopes}};
       this.persist(saved);this.authGeneration++;this.loading=null;this.invalid=false;this.saved=saved;this.provider=null;this.pending=null;clearTimeout(this.timer);this.message='Вход выполнен';this.emit('change');this.emit('authorized');
+      try{this.savePending(null);}catch{}
     }catch(error){
       if(generation!==this.serial)return;
       const code=errorCode(error);
       if(/authorization_pending/i.test(code)){this.schedule(generation);return;}
       if(/slow_down/i.test(code)){pending.interval+=5000;this.schedule(generation);return;}
       if(!error.statusCode&&!error.publicMessage){this.message='Нет ответа Twitch. Повторяем подключение';this.emit('change');this.schedule(generation);return;}
-      this.pending=null;this.message=safeError(error);this.emit('change');
+      this.pending=null;try{this.savePending(null);}catch{}this.message=safeError(error);this.emit('change');
     }
   }
   async getProvider(){
@@ -82,6 +96,6 @@ class TwitchAuth extends EventEmitter {
     this.validatedAt=this.now();
   }
   logout(){this.cancel();this.authGeneration++;this.loading=null;this.provider=null;this.invalid=false;this.saved=null;this.persist(null);this.message='Вы вышли из аккаунта';this.emit('change');}
-  dispose(){this.cancel();this.authGeneration++;this.removeAllListeners();}
+  dispose(){this.serial++;clearTimeout(this.timer);this.authGeneration++;this.removeAllListeners();}
 }
 module.exports={TwitchAuth,SCOPES,clientId,loadSdk,errorCode,safeError,publicError,verificationUrl};

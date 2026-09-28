@@ -16,6 +16,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QDockWidget>
+#include <QMainWindow>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSet>
@@ -108,8 +110,9 @@ void ShoutoutDock::build(){
     auto header=new QHBoxLayout;
     auto mark=label("S","brand");mark->setAlignment(Qt::AlignCenter);mark->setFixedSize(34,34);header->addWidget(mark);
     auto titles=new QVBoxLayout;titles->setSpacing(1);titles->addWidget(label("Shoutout Desk","title"));titles->addWidget(label("OBS EDITION","eyebrow"));header->addLayout(titles);header->addStretch();
+    if(!preview){auto attach=tool("panel-right",t("dockInObs"));header->addWidget(attach);connect(attach,&QToolButton::clicked,this,[this]{attachToObs();});}
     auto reconnect=tool("refresh-cw",t("reconnect"));header->addWidget(reconnect);connect(reconnect,&QToolButton::clicked,this,[this]{command("reconnect");});root->addLayout(header);
-    auto account=new QHBoxLayout;accountLabel=label(t("notConnected"),"account");account->addWidget(accountLabel,1);
+    auto account=new QHBoxLayout;accountLabel=label(t("restoring"),"account");account->addWidget(accountLabel,1);
     enabled=new QCheckBox(t("enabled"));enabled->setEnabled(false);account->addWidget(enabled);
     connect(enabled,&QCheckBox::toggled,this,[this](bool checked){if(!painting)command("prefs",{{"enabled",checked}});});root->addLayout(account);
     notice=label({},"notice");notice->hide();root->addWidget(notice);
@@ -139,7 +142,7 @@ void ShoutoutDock::build(){
     connect(historySearch,&QLineEdit::textChanged,this,[this]{historySignature.clear();historyLimit=40;renderHistory();});
 
     auto settings=new QWidget;auto s=column(settings);s->setContentsMargins(0,12,6,8);
-    s->addWidget(label(t("twitch"),"section"));authLabel=label({},"muted");s->addWidget(authLabel);
+    s->addWidget(label(t("twitch"),"section"));authLabel=label(t("restoring"),"muted");s->addWidget(authLabel);
     clientEdit=new QLineEdit;clientEdit->setPlaceholderText("Public Client ID");clientEdit->setMaxLength(64);s->addWidget(clientEdit);
     loginButton=button(t("login"),"log-in");loginButton->setObjectName("primary");s->addWidget(loginButton);
     connect(loginButton,&QPushButton::clicked,this,[this]{command("login",{{"clientId",clientEdit->text()}},[this](QJsonValue value){auto pending=value.toObject().value("pending").toObject();if(!pending.isEmpty())openUrl(pending.value("url").toString());});});
@@ -154,6 +157,14 @@ void ShoutoutDock::build(){
     auto saveTimer=new QTimer(hours);saveTimer->setSingleShot(true);saveTimer->setInterval(300);
     connect(hours,&QSlider::valueChanged,this,[this,saveTimer]{if(!painting)saveTimer->start();});
     connect(saveTimer,&QTimer::timeout,this,[this]{command("prefs",{{"cooldownHours",hours->value()}});});
+    resetAfterLongClose=new QCheckBox(t("resetAfterLongClose"));s->addWidget(resetAfterLongClose);
+    connect(resetAfterLongClose,&QCheckBox::toggled,this,[this](bool checked){if(!painting)command("prefs",{{"resetAfterLongClose",checked}});});
+    s->addWidget(label(t("resetAfterLongCloseHelp"),"muted"));
+    auto resetCooldowns=button(t("resetCooldowns"),"rotate-ccw");s->addWidget(resetCooldowns);
+    connect(resetCooldowns,&QPushButton::clicked,this,[this]{
+        const auto answer=QMessageBox::question(this,t("resetCooldowns"),t("resetCooldownsConfirm"),QMessageBox::Yes|QMessageBox::No,QMessageBox::No);
+        if(answer==QMessageBox::Yes)command("resetCooldowns",{},[this](QJsonValue){QMessageBox::information(this,t("resetCooldowns"),t("cooldownsReset"));});
+    });
     s->addSpacing(8);s->addWidget(label(t("data"),"section"));
     auto transfer=new QHBoxLayout;auto import=button(t("import"),"upload");auto exportButton=button(t("export"),"download");transfer->addWidget(import);transfer->addWidget(exportButton);s->addLayout(transfer);
     connect(import,&QPushButton::clicked,this,[this]{
@@ -167,12 +178,12 @@ void ShoutoutDock::build(){
     s->addWidget(label(t("language"),"section"));languages=new QComboBox;languages->setObjectName("language");
     languages->addItem("Українська","uk-UA");languages->addItem("Русский","ru-RU");languages->addItem("English","en-US");languages->setCurrentIndex(languages->findData(language));s->addWidget(languages);
     connect(languages,&QComboBox::currentIndexChanged,this,[this](int index){if(!painting)command("language",{{"value",languages->itemData(index).toString()}});});
-    s->addSpacing(8);versionLabel=label("Shoutout Desk OBS 0.1.0","muted");s->addWidget(versionLabel);
+    s->addSpacing(8);versionLabel=label("Shoutout Desk OBS 0.1.1","muted");s->addWidget(versionLabel);
     auto update=button(t("checkUpdate"),"refresh-cw");s->addWidget(update);
     connect(update,&QPushButton::clicked,this,[this,update]{update->setEnabled(false);QPointer<QPushButton> guard(update);command("update",{},[this,guard](QJsonValue v){if(guard)guard->setEnabled(true);auto r=v.toObject();if(r.value("available").toBool()){if(QMessageBox::question(this,t("update"),t("updateAvailable").arg(r.value("version").toString()))==QMessageBox::Yes)openUrl(r.value("url").toString());}else QMessageBox::information(this,t("update"),t("upToDate"));});QTimer::singleShot(15000,update,[update]{update->setEnabled(true);});});
     s->addStretch();tabs->addTab(scrollArea(settings),icon("settings-2"),t("settings"));
     connection=label(t("starting"),"connection");root->addWidget(connection);
-    codeLabel->hide();openAuthButton->hide();logoutButton->hide();
+    codeLabel->hide();openAuthButton->hide();logoutButton->hide();loginButton->hide();clientEdit->hide();
 }
 void ShoutoutDock::startWorker(){
     QDir().mkpath(profileRoot);lock=std::make_unique<QLockFile>(profileRoot+"/worker.lock");lock->setStaleLockTime(0);
@@ -201,6 +212,7 @@ void ShoutoutDock::readWorker(){
         auto line=buffer.left(pos);buffer.remove(0,pos+1);auto message=QJsonDocument::fromJson(line).object();
         if(message.value("event")=="state"){
             state=message.value("data").toObject();
+            if(state.value("notice").toString().isEmpty())notice->hide();
             auto next=state.value("language").toString("ru-RU");
             if(next!=language){
                 language=next;loadLanguage();const int index=tabs->currentIndex();
@@ -215,6 +227,15 @@ void ShoutoutDock::readWorker(){
     }
 }
 void ShoutoutDock::showError(const QString &message){notice->setText(message);notice->show();}
+void ShoutoutDock::attachToObs(){
+    QDockWidget *container=nullptr;
+    for(auto parent=parentWidget();parent;parent=parent->parentWidget())if((container=qobject_cast<QDockWidget*>(parent)))break;
+    if(!container)return;
+    auto main=qobject_cast<QMainWindow*>(container->parentWidget());
+    if(!main)return;
+    main->addDockWidget(Qt::RightDockWidgetArea,container);
+    container->setFloating(false);container->show();container->raise();
+}
 void ShoutoutDock::openUrl(const QString &value){
     const QUrl url(value);
     const bool twitch=url.scheme()=="https"&&url.host()=="www.twitch.tv"&&url.path()=="/activate";
@@ -227,6 +248,7 @@ void ShoutoutDock::render(){
     const bool logged=!auth.value("user").isNull()&&!auth.value("user").toObject().isEmpty();
     accountLabel->setText(account.value("channel").toString().isEmpty()?t("notConnected"):"@"+account.value("channel").toString());
     enabled->setEnabled(logged||preview);enabled->setChecked(prefs.value("enabled").toBool());
+    resetAfterLongClose->setChecked(prefs.value("resetAfterLongClose").toBool());
     hours->setValue(prefs.value("cooldownHours").toInt(24));hoursLabel->setText(t("hours").arg(hours->value()));
     const bool connected=state.value("connected").toBool(),live=state.value("live").toBool();
     connection->setText(preview?t("demo"):connected?(live?t("live"):t("offline")):logged?t("connecting"):t("notConnected"));

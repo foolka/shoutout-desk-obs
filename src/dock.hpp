@@ -56,7 +56,7 @@ private:
     QJsonObject state, words;
     QLabel *connection = nullptr, *accountLabel = nullptr, *summary = nullptr, *notice = nullptr;
     QLabel *hoursLabel = nullptr, *codeLabel = nullptr, *authLabel = nullptr, *versionLabel = nullptr;
-    QCheckBox *enabled = nullptr;
+    QCheckBox *enabled = nullptr, *resetAfterLongClose = nullptr;
     QTabWidget *tabs = nullptr;
     QLineEdit *addEdit = nullptr, *search = nullptr, *historySearch = nullptr, *clientEdit = nullptr;
     QComboBox *sort = nullptr, *languages = nullptr;
@@ -78,6 +78,7 @@ private:
     void renderPeople();
     void renderHistory();
     void showError(const QString &message);
+    void attachToObs();
     void openUrl(const QString &url);
     QIcon icon(const QString &name) const;
     QToolButton *tool(const QString &name, const QString &tooltip);

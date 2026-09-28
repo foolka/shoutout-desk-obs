@@ -1,4 +1,10 @@
 {
+  "restoring":"Restoring sign-in…","dockInObs":"Dock in OBS",
+  "resetAfterLongClose":"Reset after closing OBS",
+  "resetAfterLongCloseHelp":"If OBS was closed for more than 60 minutes, the next launch resets cooldowns for the current channel. People and history stay intact. A new chat message is required; Twitch limits still apply.",
+  "resetCooldowns":"Reset all cooldowns",
+  "resetCooldownsConfirm":"Reset all plugin cooldowns for the current channel? People and history will be kept. Pending shoutouts will be cancelled: a new chat message is required. Twitch limits cannot be reset.",
+  "cooldownsReset":"Plugin cooldowns reset. Waiting for new chat messages. People and history were kept.",
   "people":"People","history":"History","settings":"Settings","reconnect":"Reconnect",
   "notConnected":"Not connected","enabled":"Enabled","nickname":"Twitch name or link","add":"Add",
   "search":"Search names","newest":"Newest","oldest":"Oldest","nameAZ":"Name A-Z",

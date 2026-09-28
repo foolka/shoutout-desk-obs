@@ -54,7 +54,7 @@ class Store {
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   prefs() {
-    const out = { cooldownHours: 24, enabled: false };
+    const out = { cooldownHours: 24, enabled: false, resetAfterLongClose: false };
     for (const row of this.db.prepare('SELECT * FROM preferences').all()) {
       if (Object.hasOwn(out, row.key)) out[row.key] = JSON.parse(row.value);
     }
@@ -64,7 +64,7 @@ class Store {
     for (const [key, value] of Object.entries(patch)) {
       if (key === 'cooldownHours') {
         if (!Number.isInteger(value) || value < 1 || value > 168) throw Error('Интервал: от 1 до 168 часов.');
-      } else if (key === 'enabled') {
+      } else if (key === 'enabled' || key === 'resetAfterLongClose') {
         if (typeof value !== 'boolean') throw Error('Некорректное значение настройки.');
       } else throw Error('Неизвестная настройка.');
     }
@@ -84,10 +84,22 @@ class Store {
     this.db.prepare("UPDATE attempts SET status='cancelled',detail='Удалён из списка' WHERE account=? AND login=? AND status='queued'").run(account,login);
   }
   last(account, login) {
+    const cutoff=this.cooldownResetAt(account);
     const attempt=this.db.prepare(`SELECT MAX(CASE WHEN status='sent' THEN finished_at ELSE started_at END) AS stamp
-      FROM attempts WHERE account=? AND login=? AND status IN ('sent','sending','uncertain')`).get(account,login).stamp;
-    const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=?').get(account,login).stamp;
+      FROM attempts WHERE account=? AND login=? AND status IN ('sent','sending','uncertain')
+      AND (CASE WHEN status='sent' THEN finished_at ELSE started_at END)>?`).get(account,login,cutoff).stamp;
+    const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=? AND stamp>?').get(account,login,cutoff).stamp;
     return attempt==null?observed:observed==null?attempt:Math.max(attempt,observed);
+  }
+  cooldownResetAt(account){return this.meta('cooldownReset:'+account,0);}
+  resetCooldowns(account=this.lastAccount().id){
+    if(!account)return false;
+    this.db.exec('BEGIN IMMEDIATE');
+    try{
+      this.setMeta('cooldownReset:'+account,Math.max(this.now(),this.cooldownResetAt(account)));
+      this.db.prepare("UPDATE attempts SET status='cancelled',detail='Таймауты сброшены: ожидаем новое сообщение' WHERE account=? AND status='queued'").run(account);
+      this.db.exec('COMMIT');return true;
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   observeShoutout(account,login,stamp){
     if(!account||!Number.isFinite(stamp)||stamp<=0||stamp>this.now()+60000)return false;
@@ -100,7 +112,8 @@ class Store {
     const row=this.db.prepare("SELECT * FROM attempts WHERE id=? AND status='sending'").get(id);
     if(!row||!this.prefs().enabled||!this.db.prepare('SELECT 1 FROM channel_people WHERE account=? AND login=? AND active=1').get(row.account,row.login))return false;
     // Exclude this attempt's own in-flight reservation from the final check.
-    const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=?').get(row.account,row.login).stamp;
+    if(row.started_at<=this.cooldownResetAt(row.account))return false;
+    const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=? AND stamp>?').get(row.account,row.login,this.cooldownResetAt(row.account)).stamp;
     return observed==null||observed+this.prefs().cooldownHours*3600000<=this.now();
   }
   nextAt(account,login) {

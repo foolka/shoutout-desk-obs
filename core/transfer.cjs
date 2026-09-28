@@ -6,6 +6,7 @@ function exportBundle(store, account) {
     format:'shoutout-desk-obs', version:1, exportedAt:store.now(),
     account:{id:account, channel:store.lastAccount().channel},
     cooldownHours:store.prefs().cooldownHours,
+    cooldownResetAt:store.cooldownResetAt(account),
     people:store.db.prepare('SELECT login,added_at,active FROM channel_people WHERE account=?').all(account),
     attempts:store.db.prepare('SELECT * FROM attempts WHERE account=? ORDER BY created_at').all(account),
     observed:store.db.prepare('SELECT login,stamp FROM observed_shoutouts WHERE account=?').all(account)
@@ -47,6 +48,7 @@ function importBundle(store, value, account) {
   const observed = value.observed.map(o=>({login:normalizeLogin(o.login), stamp:stamp(o.stamp)}));
   const hours = value.cooldownHours;
   if (!Number.isInteger(hours)||hours<1||hours>168) throw Error('Некорректный таймаут.');
+  const resetAt=value.cooldownResetAt==null||value.cooldownResetAt===0?0:stamp(value.cooldownResetAt);
   store.db.exec('BEGIN IMMEDIATE');
   try {
     for (const p of people) store.db.prepare('INSERT INTO channel_people VALUES (?,?,?,?) ON CONFLICT(account,login) DO UPDATE SET active=MAX(active,excluded.active),added_at=MIN(added_at,excluded.added_at)').run(account,p.login,p.added_at,p.active);
@@ -55,6 +57,7 @@ function importBundle(store, value, account) {
     // Import never resumes automation or replays old pending requests.
     store.db.prepare('INSERT OR REPLACE INTO preferences VALUES (?,?)').run('enabled','false');
     store.db.prepare('INSERT OR REPLACE INTO preferences VALUES (?,?)').run('cooldownHours',JSON.stringify(hours));
+    store.setMeta('cooldownReset:'+account,Math.max(resetAt,store.cooldownResetAt(account)));
     store.db.exec('COMMIT');
   } catch (error) { store.db.exec('ROLLBACK'); throw error; }
   return {people:people.filter(p=>p.active).length, history:attempts.length};

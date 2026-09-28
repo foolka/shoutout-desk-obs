@@ -8,6 +8,7 @@ const {DirectBridge}=require('./core/twitch-direct.cjs');
 const {vault,prepareProfile,backupProfile,atomicWrite}=require('./core/vault.cjs');
 const {exportBundle,importBundle,readDesktop}=require('./core/transfer.cjs');
 const {checkUpdate}=require('./core/update.cjs');
+const {ObsSession,HEARTBEAT_MS}=require('./core/session.cjs');
 const VERSION=require('./package.json').version;
 
 async function main() {
@@ -17,9 +18,13 @@ async function main() {
   await prepareProfile(dir,VERSION);
   const store=new Store(path.join(dir,'shoutouts.sqlite'));
   const secrets=vault(path.join(dir,'twitch-auth.dpapi'),helper);
+  const pendingSecrets=vault(path.join(dir,'twitch-login.dpapi'),helper);
   let saved=null,notice='',bridge=null,engine=null,closing=false,refreshing=false,generation=0;
+  let pending=null;
   try{if(!demo)saved=secrets.load();}catch{notice='Защищённый вход недоступен. Войдите снова; список и история сохранены.';}
-  const auth=new TwitchAuth({saved,save:v=>secrets.save(v)});
+  try{if(!demo&&!saved)pending=pendingSecrets.load();}catch{notice='Незавершённый вход недоступен. Войдите через Twitch ещё раз.';}
+  const auth=new TwitchAuth({saved,save:v=>secrets.save(v),pending,savePending:v=>pendingSecrets.save(v)});
+  const session=new ObsSession(store);
   const emit=value=>{if(!closing)process.stdout.write(JSON.stringify(value)+'\n');};
   if(demo){
     store.rememberAccount('999001','demo_channel');
@@ -76,6 +81,10 @@ async function main() {
     cancelLogin:async()=>{auth.cancel();connect();},
     logout:async()=>{disconnect();store.setPrefs({enabled:false});auth.logout();notice='';changed();},
     reconnect:async()=>{notice='';connect();},
+    resetCooldowns:async()=>{
+      if(engine?.busy)throw Error('Дождитесь завершения текущего шотаута и повторите сброс.');
+      const reset=store.resetCooldowns();changed();return {reset};
+    },
     export:async p=>{
       if(!path.isAbsolute(p.path||''))throw Error('Invalid export path.');
       if(fs.existsSync(p.path))throw Error('Выберите новое имя файла: существующий файл не перезаписывается.');
@@ -93,8 +102,9 @@ async function main() {
     quit:async()=>shutdown()
   };
   function shutdown(){
-    if(closing)return;disconnect();closing=true;auth.dispose();clearTimeout(debounce);clearInterval(tick);clearInterval(refresh);store.close();process.exit(0);
+    if(closing)return;disconnect();closing=true;auth.dispose();clearTimeout(debounce);clearInterval(tick);clearInterval(refresh);clearInterval(heartbeat);session.close();store.close();process.exit(0);
   }
+  const heartbeat=setInterval(()=>session.touch(),HEARTBEAT_MS);
   const tick=setInterval(()=>{if(engine)void engine.tick().catch(()=>{notice='Ошибка обработки очереди. Переподключитесь.';disconnect();changed();});},1000);
   const refresh=setInterval(async()=>{
     if(refreshing||!engine?.ready)return;refreshing=true;const active=engine;
@@ -116,7 +126,7 @@ async function main() {
     });
   });
   input.on('close',shutdown);process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
-  emit({event:'state',data:state()});connect();
+  emit({event:'state',data:state()});connect();auth.resume();
 }
 process.on('uncaughtException',()=>{process.stdout.write(JSON.stringify({event:'fatal',error:'The local worker stopped. Your data is preserved.'})+'\n');process.exit(1);});
 process.on('unhandledRejection',()=>{process.stdout.write(JSON.stringify({event:'fatal',error:'The local worker stopped. Your data is preserved.'})+'\n');process.exit(1);});

@@ -16,6 +16,8 @@ A local Twitch auto-shoutout plugin with a compact, dark OBS Studio dock. Add st
 2. Close OBS completely. Run `Install.cmd`; run it as administrator if Windows denies access to ProgramData.
 3. Open OBS → **Docks → Shoutout Desk**. Dock or float the panel wherever you prefer.
 
+The panel icon next to Reconnect docks Shoutout Desk on the right of OBS, even when dock dragging is locked. To drag panels manually, turn off **Docks → Lock Docks**. Other docks are not unlocked by the plugin.
+
 The installer checks package SHA-256 hashes and installs only `C:\ProgramData\obs-studio\plugins\shoutout-desk-obs`. It does not replace OBS/Qt DLLs, scenes, sources, profiles, or stream settings. This preview installer targets a standard OBS installation, not portable mode.
 
 ## Setup
@@ -29,6 +31,10 @@ The public build includes a shared **Public Client ID**. No client secret is nee
 Permissions: `user:read:chat` and `moderator:manage:shoutouts`. The latter is Twitch's permission name; the plugin only operates on the signed-in broadcaster's own channel. It cannot select a moderated channel. Twitch's stream-key, email, subscription and financial permissions are not requested.
 
 ## Updates And Data
+
+**Reset after closing OBS** is off by default. When enabled, the next launch resets personal plugin cooldowns only if OBS was closed for more than 60 minutes. A running OBS does not count as time closed. After an abnormal exit, the last heartbeat plus a 30-second grace period is used. The first launch has no previous session to reset.
+
+**Reset all cooldowns** asks for confirmation (No by default). Both resets preserve people and history, cancel pending requests and require a new chat message. Twitch's own rate limits and the global safety gap remain. Neither reset starts a broadcast or immediately sends shoutouts.
 
 - Click **Settings → Check for updates**, download and extract the new full ZIP, close OBS and run the new `Install.cmd`. Never replace just the DLL.
 - Data lives separately in `%LOCALAPPDATA%\Shoutout Desk OBS`. Updating or reinstalling plugin files does not erase it.

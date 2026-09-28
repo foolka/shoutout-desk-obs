@@ -16,7 +16,7 @@ async function main(){
   for(const dir of ['core','data'])fs.cpSync(path.join(root,dir),path.join(data,dir),{recursive:true});
   const prod=JSON.parse(fs.readFileSync(path.join(root,'package-lock.json'))).packages;
   for(const [relative,meta] of Object.entries(prod))if(relative&&relative.startsWith('node_modules/')&&!meta.dev)fs.cpSync(path.join(root,relative),path.join(data,relative),{recursive:true});
-  const icons=['plus','x','users','history','settings-2','refresh-cw','chevron-down','check','log-in','log-out','external-link','book-open','upload','download','folder-open','user-plus'];
+  const icons=['plus','x','users','history','settings-2','refresh-cw','chevron-down','check','log-in','log-out','external-link','book-open','upload','download','folder-open','user-plus','panel-right','rotate-ccw'];
   for(const name of icons){const svg=fs.readFileSync(path.join(root,'node_modules/lucide-static/icons',name+'.svg'),'utf8').replaceAll('currentColor','#bbd5cd');mkdir(path.join(data,'data/icons'));fs.writeFileSync(path.join(data,'data/icons',name+'.svg'),svg);}
   copy(path.join(root,'node_modules/lucide-static/LICENSE'),path.join(data,'data/icons/LICENSE'));
   mkdir(path.join(data,'runtime'));

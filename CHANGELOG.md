@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1 - 2026-09-28
+
+- Show sign-in restoration during startup instead of briefly offering a new login.
+- Resume unfinished device authorization from a Windows DPAPI-protected pending login.
+- Add a Dock in OBS button without unlocking unrelated docks.
+- Add opt-in cooldown reset after OBS has been closed for more than 60 minutes.
+- Add manual cooldown reset with a default-No confirmation; preserve people and history.
+- Keep Twitch rate limits, cancel queued requests after reset, require fresh chat messages.
+- Preserve reset state across restarts and data export/import.
+
 ## 0.1.0 - 2026-09-28
 
 Initial public preview.
