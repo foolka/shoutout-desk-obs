@@ -31,7 +31,7 @@ Permissions: `user:read:chat` and `moderator:manage:shoutouts`. The latter is Tw
 ## Updates And Data
 
 - Click **Settings → Check for updates**, download and extract the new full ZIP, close OBS and run the new `Install.cmd`. Never replace just the DLL.
-- Data lives separately in `%APPDATA%\Shoutout Desk OBS`. Updating or reinstalling plugin files does not erase it.
+- Data lives separately in `%LOCALAPPDATA%\Shoutout Desk OBS`. Updating or reinstalling plugin files does not erase it.
 - Before opening an existing database with a new plugin version, a consistent SQLite backup (including WAL) and encrypted sign-in backup are saved under `backups`. If backup fails, startup stops.
 - Previous installed plugin files are kept under `%PROGRAMDATA%\ShoutoutDeskOBS-install-backups`. Use the matching data backup when rolling back across a future database migration.
 - **Import / Export** transfers lists, history and cooldowns, never OAuth tokens. Import can read a Shoutout Desk desktop `shoutouts.sqlite` from the same account, creates a backup, merges rather than deletes, and leaves automation paused. Close the desktop app first.
