@@ -1,5 +1,6 @@
 {
   "restoring":"Restoring sign-in…","dockInObs":"Dock in OBS",
+  "undockFromObs":"Undock from OBS",
   "resetAfterLongClose":"Reset after closing OBS",
   "resetAfterLongCloseHelp":"If OBS was closed for more than 60 minutes, the next launch resets cooldowns for the current channel. People and history stay intact. A new chat message is required; Twitch limits still apply.",
   "resetCooldowns":"Reset all cooldowns",

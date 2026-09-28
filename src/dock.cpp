@@ -110,7 +110,15 @@ void ShoutoutDock::build(){
     auto header=new QHBoxLayout;
     auto mark=label("S","brand");mark->setAlignment(Qt::AlignCenter);mark->setFixedSize(34,34);header->addWidget(mark);
     auto titles=new QVBoxLayout;titles->setSpacing(1);titles->addWidget(label("Shoutout Desk","title"));titles->addWidget(label("OBS EDITION","eyebrow"));header->addLayout(titles);header->addStretch();
-    if(!preview){auto attach=tool("panel-right",t("dockInObs"));header->addWidget(attach);connect(attach,&QToolButton::clicked,this,[this]{attachToObs();});}
+    if(!preview){
+        dockToggle=tool("panel-right",t("dockInObs"));dockToggle->setObjectName("dockToggle");dockToggle->setEnabled(false);header->addWidget(dockToggle);
+        connect(dockToggle,&QToolButton::clicked,this,[this]{toggleDocking();});
+        // OBS creates the QDockWidget wrapper after constructing this widget.
+        QTimer::singleShot(0,dockToggle,[this]{
+            if(auto container=hostDock())connect(container,&QDockWidget::topLevelChanged,dockToggle,[this](bool){updateDockButton();});
+            updateDockButton();
+        });
+    }
     auto reconnect=tool("refresh-cw",t("reconnect"));header->addWidget(reconnect);connect(reconnect,&QToolButton::clicked,this,[this]{command("reconnect");});root->addLayout(header);
     auto account=new QHBoxLayout;accountLabel=label(t("restoring"),"account");account->addWidget(accountLabel,1);
     enabled=new QCheckBox(t("enabled"));enabled->setEnabled(false);account->addWidget(enabled);
@@ -178,7 +186,7 @@ void ShoutoutDock::build(){
     s->addWidget(label(t("language"),"section"));languages=new QComboBox;languages->setObjectName("language");
     languages->addItem("Українська","uk-UA");languages->addItem("Русский","ru-RU");languages->addItem("English","en-US");languages->setCurrentIndex(languages->findData(language));s->addWidget(languages);
     connect(languages,&QComboBox::currentIndexChanged,this,[this](int index){if(!painting)command("language",{{"value",languages->itemData(index).toString()}});});
-    s->addSpacing(8);versionLabel=label("Shoutout Desk OBS 0.1.2","muted");s->addWidget(versionLabel);
+    s->addSpacing(8);versionLabel=label("Shoutout Desk OBS 0.1.3","muted");s->addWidget(versionLabel);
     auto update=button(t("checkUpdate"),"refresh-cw");s->addWidget(update);
     connect(update,&QPushButton::clicked,this,[this,update]{update->setEnabled(false);QPointer<QPushButton> guard(update);command("update",{},[this,guard](QJsonValue v){if(guard)guard->setEnabled(true);auto r=v.toObject();if(r.value("available").toBool()){if(QMessageBox::question(this,t("update"),t("updateAvailable").arg(r.value("version").toString()))==QMessageBox::Yes)openUrl(r.value("url").toString());}else QMessageBox::information(this,t("update"),t("upToDate"));});QTimer::singleShot(15000,update,[update]{update->setEnabled(true);});});
     s->addStretch();tabs->addTab(scrollArea(settings),icon("settings-2"),t("settings"));
@@ -227,14 +235,27 @@ void ShoutoutDock::readWorker(){
     }
 }
 void ShoutoutDock::showError(const QString &message){notice->setText(message);notice->show();}
-void ShoutoutDock::attachToObs(){
-    QDockWidget *container=nullptr;
-    for(auto parent=parentWidget();parent;parent=parent->parentWidget())if((container=qobject_cast<QDockWidget*>(parent)))break;
-    if(!container)return;
+QDockWidget *ShoutoutDock::hostDock() const{
+    for(auto parent=parentWidget();parent;parent=parent->parentWidget())if(auto container=qobject_cast<QDockWidget*>(parent))return container;
+    return nullptr;
+}
+void ShoutoutDock::updateDockButton(){
+    if(!dockToggle)return;
+    auto container=hostDock();dockToggle->setEnabled(container!=nullptr);
+    const bool floating=container&&container->isFloating();
+    const auto action=t(floating?"dockInObs":"undockFromObs");
+    dockToggle->setIcon(icon(floating?"panel-right":"external-link"));
+    dockToggle->setToolTip(action);dockToggle->setAccessibleName(action);
+}
+void ShoutoutDock::toggleDocking(){
+    auto container=hostDock();if(!container)return;
     auto main=qobject_cast<QMainWindow*>(container->parentWidget());
     if(!main)return;
-    main->addDockWidget(Qt::RightDockWidgetArea,container);
-    container->setFloating(false);container->show();container->raise();
+    if(container->isFloating()){
+        if(main->dockWidgetArea(container)==Qt::NoDockWidgetArea)main->addDockWidget(Qt::RightDockWidgetArea,container);
+        container->setFloating(false);
+    }else container->setFloating(true);
+    container->show();container->raise();updateDockButton();
 }
 void ShoutoutDock::openUrl(const QString &value){
     const QUrl url(value);

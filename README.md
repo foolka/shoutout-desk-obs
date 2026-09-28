@@ -16,7 +16,7 @@ A local Twitch auto-shoutout plugin with a compact, dark OBS Studio dock. Add st
 2. Close OBS completely. Run `Install.cmd`; run it as administrator if Windows denies access to ProgramData.
 3. Open OBS → **Docks → Shoutout Desk**. Dock or float the panel wherever you prefer.
 
-The panel icon next to Reconnect docks Shoutout Desk on the right of OBS, even when dock dragging is locked. To drag panels manually, turn off **Docks → Lock Docks**. Other docks are not unlocked by the plugin.
+The button next to Reconnect switches between **Undock from OBS** (arrow icon) and **Dock in OBS** (panel icon). It works even when dock dragging is locked and returns to the previous dock area, or the right side if none is available. To drag panels manually, turn off **Docks → Lock Docks**. Other docks are not unlocked by the plugin.
 
 The installer checks package SHA-256 hashes and installs only `C:\ProgramData\obs-studio\plugins\shoutout-desk-obs`. It does not replace OBS/Qt DLLs, scenes, sources, profiles, or stream settings. This preview installer targets a standard OBS installation, not portable mode.
 

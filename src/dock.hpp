@@ -18,6 +18,7 @@ class QToolButton;
 class QTabWidget;
 class QVBoxLayout;
 class QDateEdit;
+class QDockWidget;
 
 class FlowLayout : public QLayout {
 public:
@@ -66,6 +67,7 @@ private:
     FlowLayout *peopleLayout = nullptr;
     QVBoxLayout *historyLayout = nullptr;
     QPushButton *loginButton = nullptr, *logoutButton = nullptr, *openAuthButton = nullptr;
+    QToolButton *dockToggle = nullptr;
     int historyLimit = 40;
     QString peopleSignature, historySignature;
     void loadLanguage();
@@ -78,7 +80,9 @@ private:
     void renderPeople();
     void renderHistory();
     void showError(const QString &message);
-    void attachToObs();
+    QDockWidget *hostDock() const;
+    void toggleDocking();
+    void updateDockButton();
     void openUrl(const QString &url);
     QIcon icon(const QString &name) const;
     QToolButton *tool(const QString &name, const QString &tooltip);

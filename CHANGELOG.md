@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 - 2026-09-28
+
+- Toggle the panel between docked and floating instead of only docking it.
+- Update the button icon and localized tooltip when the dock state changes.
+- Preserve the previous dock area when reattaching, without unlocking other OBS docks.
+
 ## 0.1.2 - 2026-09-28
 
 - Accept legacy Voice history IDs when importing a desktop database, without losing records or cooldowns.
