@@ -2,7 +2,7 @@
 
 [Українська](README.uk.md) · [Русский](README.ru.md) · **English**
 
-A local Twitch auto-shoutout plugin with a compact, dark OBS Studio dock. Add streamers to a list; their first chat message after your cooldown queues an official Twitch shoutout. No Streamer.bot, cloud account, or moderator mode.
+A local Twitch auto-shoutout plugin with a compact, dark OBS Studio dock. Add streamers to a list; their first chat message after your cooldown queues an official Twitch shoutout.
 
 ## Requirements
 
