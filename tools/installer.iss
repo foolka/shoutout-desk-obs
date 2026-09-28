@@ -126,6 +126,8 @@ procedure InitializeWizard;
 var
   Root: String;
 begin
+  WizardForm.ReadyMemo.WordWrap := True;
+  WizardForm.ReadyMemo.ScrollBars := ssVertical;
   ObsPage := CreateInputDirPage(wpLicense, CustomMessage('ObsTitle'),
     CustomMessage('ObsDescription'), CustomMessage('ObsExplanation'), False, '');
   ObsPage.Add('OBS Studio:');
