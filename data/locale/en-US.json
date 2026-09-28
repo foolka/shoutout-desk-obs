@@ -1,0 +1,19 @@
+{
+  "people":"People","history":"History","settings":"Settings","reconnect":"Reconnect",
+  "notConnected":"Not connected","enabled":"Enabled","nickname":"Twitch name or link","add":"Add",
+  "search":"Search names","newest":"Newest","oldest":"Oldest","nameAZ":"Name A-Z",
+  "allDates":"All dates","addedSince":"Added since","clearDate":"Clear date filter",
+  "twitch":"Twitch account","login":"Sign in with Twitch","openTwitch":"Open Twitch","logout":"Sign out",
+  "logoutConfirm":"Sign out and pause auto-shoutouts? Your list and history will remain on this computer.",
+  "setupGuide":"Setup guide","interval":"Per-person cooldown","hours":"%1 hours","data":"Local data",
+  "import":"Import","export":"Export","importConfirm":"Merge the list and history? A backup will be created first. Auto-shoutouts will be paused. Tokens are not imported.",
+  "imported":"Imported people: %1. Auto-shoutouts are paused.","exported":"Export saved without Twitch tokens.",
+  "openData":"Open data folder","localData":"Local storage · no cloud sync","language":"Language",
+  "checkUpdate":"Check for updates","update":"Update","updateAvailable":"Version %1 is available. Open the release page? Close OBS before installing.",
+  "upToDate":"No newer stable release is available.","starting":"Starting local worker…",
+  "alreadyRunning":"Another OBS instance is already using this plugin's data.","workerFailed":"The local worker is unavailable. Check the installation and restart OBS. Your data is preserved.",
+  "live":"Connected · channel is live","offline":"Connected · channel is offline","connecting":"Connecting to Twitch…","demo":"Offline preview · no Twitch requests",
+  "summary":"%1 people · %2 queued · %3 h cooldown","emptyPeople":"The list is empty","noResults":"No matching people",
+  "queued":"Queued","ready":"Ready","remaining":"%1 h %2 min","remove":"Remove person","emptyHistory":"No history yet",
+  "sent":"Sent","failed":"Failed","uncertain":"Unconfirmed","cancelled":"Cancelled","sending":"Sending","showMore":"Show more"
+}

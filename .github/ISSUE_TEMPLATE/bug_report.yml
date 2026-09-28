@@ -1,0 +1,22 @@
+name: Bug report
+description: Report a reproducible problem without private data
+body:
+  - type: markdown
+    attributes:
+      value: "Do not attach Twitch tokens, stream keys, Client Secrets, your database or sign-in backups. For security issues read SECURITY.md."
+  - type: input
+    id: versions
+    attributes:
+      label: OBS, Windows and plugin versions
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected result and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Redacted screenshots or relevant error text

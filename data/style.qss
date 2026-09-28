@@ -1,0 +1,51 @@
+QWidget#ShoutoutDock { background: #191d20; color: #e9eeef; font-family: "Segoe UI"; font-size: 13px; }
+QWidget#ShoutoutDock QWidget { color: #e9eeef; font-family: "Segoe UI"; font-size: 13px; }
+QLabel { background: transparent; }
+QLabel#brand { background: #aad8c8; color: #182b25; border-radius: 6px; font-size: 22px; font-weight: 700; }
+QLabel#title { font-size: 17px; font-weight: 600; }
+QLabel#eyebrow { color: #97a5ab; font-size: 9px; }
+QLabel#account { color: #a9d8c8; font-weight: 600; }
+QLabel#muted, QLabel#personStatus { color: #9eacb3; font-size: 11px; }
+QLabel#section { color: #e5eaea; font-weight: 600; font-size: 13px; }
+QLabel#value { color: #b5dece; font-weight: 600; }
+QLabel#connection { color: #a8bac2; font-size: 11px; padding-top: 8px; border-top: 1px solid #303a3f; }
+QLabel#notice { color: #f0c794; background: #302a23; padding: 8px; border-radius: 4px; }
+QLabel#empty { color: #89989e; padding: 8px; }
+QLabel#authCode { color: #c1e3d8; font-size: 24px; font-weight: 600; padding: 6px; }
+QLineEdit, QComboBox, QDateEdit { color: #e9eeef; background: #131719; border: 1px solid #374147; border-radius: 5px; min-height: 32px; padding: 0 10px; selection-background-color: #375b51; }
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus { border-color: #a6d5c4; }
+QComboBox, QDateEdit { padding-right: 34px; }
+QComboBox::drop-down, QDateEdit::drop-down { width: 30px; border: none; }
+QComboBox::down-arrow, QDateEdit::down-arrow { image: url(@DATA@/data/icons/chevron-down.svg); width: 15px; height: 15px; }
+QComboBox QAbstractItemView { background: #252d31; color: #e9eeef; selection-background-color: #36594f; border: 1px solid #49575d; padding: 5px; outline: none; }
+QComboBox QAbstractItemView::item { min-height: 28px; }
+QPushButton, QToolButton { background: #293236; color: #e9eeef; border: 1px solid #3a474e; border-radius: 5px; padding: 4px 10px; }
+QToolButton { padding: 0; }
+QPushButton:hover, QToolButton:hover { background: #35434a; border-color: #6a837b; }
+QPushButton:pressed, QToolButton:pressed { background: #3d5551; }
+QPushButton:disabled, QToolButton:disabled { color: #68777f; background: #21272b; border-color: #30383d; }
+QPushButton#primary, QToolButton#primaryTool { background: #456d60; border-color: #6c9a89; color: #f5fbf8; }
+QPushButton#primary:hover, QToolButton#primaryTool:hover { background: #527f70; }
+QTabWidget::pane { border: none; border-top: 1px solid #354046; background: transparent; }
+QTabBar::tab { background: transparent; color: #a0adb3; border-bottom: 2px solid transparent; padding: 10px 9px; margin-right: 2px; }
+QTabBar::tab:selected { color: #c0e1d5; border-bottom-color: #a9d8c8; }
+QTabBar::tab:hover { background: #242d31; }
+QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; border: none; }
+QScrollBar:vertical { background: transparent; width: 8px; margin: 0; }
+QScrollBar::handle:vertical { background: #45545a; border-radius: 3px; min-height: 26px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+QFrame#person { background: #252f32; border: 1px solid #40514e; border-radius: 6px; }
+QFrame#person:hover { border-color: #8cb5a7; }
+QLabel#personName { font-weight: 600; font-size: 12px; }
+QFrame#person QToolButton { background: transparent; border: none; }
+QFrame#person QToolButton:hover { background: #493b3f; }
+QFrame#historyRow { border-bottom: 1px solid #313b40; }
+QCheckBox { spacing: 7px; }
+QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid #65766f; border-radius: 4px; background: #1b2325; }
+QCheckBox::indicator:checked { background: #507d6d; image: url(@DATA@/data/icons/check.svg); }
+QCheckBox:disabled { color: #738289; }
+QSlider::groove:horizontal { height: 5px; border-radius: 2px; background: #3c474d; }
+QSlider::sub-page:horizontal { background: #a9d8c8; border-radius: 2px; }
+QSlider::handle:horizontal { width: 14px; margin: -5px 0; border-radius: 7px; background: #c3e7d8; }
+QToolTip { color: #e9eeef; background: #252f33; border: 1px solid #586b66; padding: 5px; }
