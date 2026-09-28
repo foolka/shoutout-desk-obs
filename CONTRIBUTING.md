@@ -11,6 +11,10 @@ Use an isolated Windows profile and test Twitch responses. Do not develop agains
 
 Forks must register their own Twitch Public client. The upstream Client ID identifies the official Shoutout Desk OBS application only.
 
+## README Screenshots
+
+The native offline preview accepts `shoutout-preview.exe <plugin-data-directory> <output-directory> <language>`. After building and packaging, use the packaged plugin data directory and run it for `en-US`, `uk-UA` and `ru-RU`, saving into the matching `docs/screenshots/<language>` folder. It selects the real UI language in a temporary synthetic profile and makes no Twitch requests. Each README must use its matching folder. Run `node --test tests/docs.test.cjs` to check the links and language folders.
+
 ## Release Checklist
 
 - Run tests, native build, offline wide/narrow UI preview and source audit.

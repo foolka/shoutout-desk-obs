@@ -6,7 +6,7 @@
 
 **[Завантаження та встановлення](https://github.com/foolka/shoutout-desk-obs/releases/latest)**: Windows EXE + ZIP.
 
-![Shoutout Desk OBS](docs/screenshots/people.png)
+![Shoutout Desk OBS](docs/screenshots/uk-UA/people.png)
 
 На знімках вигадані акаунти. Особистих профілів у пакеті немає.
 
@@ -79,11 +79,11 @@ EXE і ZIP розміщуються у **GitHub Releases**, код зберіг�
 <a id="screenshots"></a>
 ## Знімки екрана
 
-![Налаштування](docs/screenshots/streamerbot.png)
+![Налаштування](docs/screenshots/uk-UA/streamerbot.png)
 
-![Параметри та кнопки](docs/screenshots/settings-data.png)
+![Параметри та кнопки](docs/screenshots/uk-UA/settings-data.png)
 
-![Знімки екрана: history](docs/screenshots/history.png)
+![Історія](docs/screenshots/uk-UA/history.png)
 
 <a id="build"></a>
 ## Збирання з вихідного коду

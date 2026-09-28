@@ -6,7 +6,7 @@ Automatic Twitch shoutouts inside a dockable OBS Studio panel. A person from you
 
 **[Download and install](https://github.com/foolka/shoutout-desk-obs/releases/latest)**: Windows EXE + ZIP.
 
-![Shoutout Desk OBS](docs/screenshots/people.png)
+![Shoutout Desk OBS](docs/screenshots/en-US/people.png)
 
 Screenshots use fictional accounts. No personal profiles are included.
 
@@ -79,11 +79,11 @@ EXE/ZIP binaries are attached to **GitHub Releases**, not committed into source 
 <a id="screenshots"></a>
 ## Screenshots
 
-![Setup](docs/screenshots/streamerbot.png)
+![Setup](docs/screenshots/en-US/streamerbot.png)
 
-![Settings and controls](docs/screenshots/settings-data.png)
+![Settings and controls](docs/screenshots/en-US/settings-data.png)
 
-![Screenshots: history](docs/screenshots/history.png)
+![History](docs/screenshots/en-US/history.png)
 
 <a id="build"></a>
 ## Build from source
