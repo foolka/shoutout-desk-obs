@@ -2,6 +2,8 @@
 #include <windows.h>
 #include <cstdint>
 #include <QDir>
+#include <QCoreApplication>
+#include <QFileInfo>
 #include <QStandardPaths>
 #include <QPointer>
 #include "dock.hpp"
@@ -34,6 +36,10 @@ extern "C" __declspec(dllexport) void obs_module_post_load(void) {
     if(!add||!data||!module)return;
     const char *root=data(module);if(!root)return;
     auto profile=QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)+"/Shoutout Desk OBS";
+    const auto obsRoot=QDir(QCoreApplication::applicationDirPath()+"/../..").absolutePath();
+    const auto args=QCoreApplication::arguments();
+    if(QFileInfo::exists(obsRoot+"/portable_mode")||QFileInfo::exists(obsRoot+"/portable_mode.txt")||args.contains("--portable")||args.contains("-p"))
+        profile=obsRoot+"/config/shoutout-desk-obs";
     const auto testProfile=qEnvironmentVariable("SHOUTOUT_DESK_OBS_TEST_PROFILE");
     const bool offlineTest=!testProfile.isEmpty()&&QDir::isAbsolutePath(testProfile);
     if(offlineTest)profile=testProfile;

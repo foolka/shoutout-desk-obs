@@ -102,6 +102,7 @@ begin
   if ((MS shr 16) <> 6) or ((MS and $FFFF) < 8) then Exit;
   Result := CustomMessage('ObsPortable');
   if FileExists(AddBackslash(Root) + 'portable_mode.txt') or
+     FileExists(AddBackslash(Root) + 'portable_mode') or
      FileExists(AddBackslash(Root) + 'bin\64bit\portable_mode.txt') or
      FileExists(AddBackslash(Root) + 'obs_portable_mode.txt') then Exit;
   Result := '';

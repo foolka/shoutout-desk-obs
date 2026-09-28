@@ -1,6 +1,6 @@
 {
   "name": "shoutout-desk-obs",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "private": true,
   "description": "Local Twitch auto-shoutouts in an OBS Studio dock",
   "license": "GPL-2.0-or-later",

@@ -35,8 +35,10 @@ async function backupProfile(dir, reason) {
     const db = new DatabaseSync(file, {readOnly:true});
     try { await backup(db, path.join(target, 'shoutouts.sqlite')); } finally { db.close(); }
   }
-  const auth = path.join(dir, 'twitch-auth.dpapi');
-  if (fs.existsSync(auth)) fs.copyFileSync(auth, path.join(target, 'twitch-auth.dpapi'));
+  for(const name of ['twitch-auth.dpapi','twitch-login.dpapi','connection.dpapi']){
+    const source=path.join(dir,name);
+    if(fs.existsSync(source))fs.copyFileSync(source,path.join(target,name));
+  }
   return target;
 }
 

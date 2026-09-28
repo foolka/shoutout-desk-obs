@@ -150,6 +150,22 @@ void ShoutoutDock::build(){
     connect(historySearch,&QLineEdit::textChanged,this,[this]{historySignature.clear();historyLimit=40;renderHistory();});
 
     auto settings=new QWidget;auto s=column(settings);s->setContentsMargins(0,12,6,8);
+    s->addWidget(label(t("connectionMode"),"section"));provider=new QComboBox;provider->setObjectName("provider");
+    provider->addItem(t("directMode"),"direct");provider->addItem("Streamer.bot","bot");s->addWidget(provider);
+    connect(provider,&QComboBox::currentIndexChanged,this,[this](int index){if(!painting)command("prefs",{{"provider",provider->itemData(index).toString()}});});
+    s->addWidget(label(t("oneInstance"),"muted"));
+    botSettings=new QWidget;auto bs=column(botSettings);botPath=new QLineEdit;botPath->setReadOnly(true);botPath->setPlaceholderText("Streamer.bot.exe");
+    auto pathRow=new QHBoxLayout;pathRow->addWidget(botPath,1);auto chooseBot=tool("folder-open",t("chooseBot"));pathRow->addWidget(chooseBot);bs->addLayout(pathRow);
+    connect(chooseBot,&QToolButton::clicked,this,[this]{auto file=QFileDialog::getOpenFileName(this,t("chooseBot"),{},"Streamer.bot (Streamer.bot.exe)");if(!file.isEmpty())botPath->setText(file);});
+    auto setup=button(t("setupBot"),"settings-2");bs->addWidget(setup);bs->addWidget(label(t("setupBotHelp"),"muted"));s->addWidget(botSettings);
+    connect(setup,&QPushButton::clicked,this,[this]{
+        if(!botPath->text().isEmpty()){setupBot(botPath->text());return;}
+        command("botDetect",{},[this](QJsonValue value){
+            auto list=value.toArray();QString file=list.size()==1?list.first().toString():QFileDialog::getOpenFileName(this,t("chooseBot"),{},"Streamer.bot (Streamer.bot.exe)");
+            if(!file.isEmpty()){botPath->setText(file);setupBot(file);}
+        });
+    });
+    auto settingsLayout=s;directSettings=new QWidget;s=column(directSettings);settingsLayout->addWidget(directSettings);
     s->addWidget(label(t("twitch"),"section"));authLabel=label(t("restoring"),"muted");s->addWidget(authLabel);
     clientEdit=new QLineEdit;clientEdit->setPlaceholderText("Public Client ID");clientEdit->setMaxLength(64);s->addWidget(clientEdit);
     loginButton=button(t("login"),"log-in");loginButton->setObjectName("primary");s->addWidget(loginButton);
@@ -159,6 +175,7 @@ void ShoutoutDock::build(){
     logoutButton=button(t("logout"),"log-out");s->addWidget(logoutButton);
     connect(logoutButton,&QPushButton::clicked,this,[this]{if(QMessageBox::question(this,t("logout"),t("logoutConfirm"))==QMessageBox::Yes)command("logout");});
     auto help=button(t("setupGuide"),"book-open");s->addWidget(help);connect(help,&QPushButton::clicked,this,[this]{openUrl("https://github.com/foolka/shoutout-desk-obs#setup");});
+    s=settingsLayout;
     s->addSpacing(8);s->addWidget(label(t("interval"),"section"));hoursLabel=label({},"value");s->addWidget(hoursLabel);
     hours=new QSlider(Qt::Horizontal);hours->setRange(1,168);hours->setSingleStep(1);hours->setPageStep(6);s->addWidget(hours);
     connect(hours,&QSlider::valueChanged,this,[this](int value){hoursLabel->setText(t("hours").arg(value));});
@@ -235,6 +252,12 @@ void ShoutoutDock::readWorker(){
     }
 }
 void ShoutoutDock::showError(const QString &message){notice->setText(message);notice->show();}
+void ShoutoutDock::setupBot(const QString &file){
+    command("botSetup",{{"exe",file}},[this](QJsonValue value){
+        if(value.toObject().value("needsClose").toBool())QMessageBox::information(this,t("setupBot"),t("closeBot"));
+        else QMessageBox::information(this,t("setupBot"),t("botReady"));
+    });
+}
 QDockWidget *ShoutoutDock::hostDock() const{
     for(auto parent=parentWidget();parent;parent=parent->parentWidget())if(auto container=qobject_cast<QDockWidget*>(parent))return container;
     return nullptr;
@@ -267,12 +290,15 @@ void ShoutoutDock::render(){
     painting=true;
     auto account=state.value("account").toObject(),auth=state.value("auth").toObject(),prefs=state.value("prefs").toObject();
     const bool logged=!auth.value("user").isNull()&&!auth.value("user").toObject().isEmpty();
+    const bool bot=prefs.value("provider").toString()=="bot";
+    provider->setCurrentIndex(bot?1:0);directSettings->setVisible(!bot);botSettings->setVisible(bot);
+    if(botPath->text().isEmpty())botPath->setText(state.value("botPath").toString());
     accountLabel->setText(account.value("channel").toString().isEmpty()?t("notConnected"):"@"+account.value("channel").toString());
-    enabled->setEnabled(logged||preview);enabled->setChecked(prefs.value("enabled").toBool());
+    enabled->setEnabled((bot?state.value("botConfigured").toBool():logged)||preview);enabled->setChecked(prefs.value("enabled").toBool());
     resetAfterLongClose->setChecked(prefs.value("resetAfterLongClose").toBool());
     hours->setValue(prefs.value("cooldownHours").toInt(24));hoursLabel->setText(t("hours").arg(hours->value()));
     const bool connected=state.value("connected").toBool(),live=state.value("live").toBool();
-    connection->setText(preview?t("demo"):connected?(live?t("live"):t("offline")):logged?t("connecting"):t("notConnected"));
+    connection->setText(preview?t("demo"):connected?(live?t("live"):t("offline")):(bot?state.value("botConfigured").toBool():logged)?t("connecting"):t("notConnected"));
     authLabel->setText(auth.value("message").toString().isEmpty()?(logged?"@"+auth.value("user").toObject().value("login").toString():t("notConnected")):auth.value("message").toString());
     versionLabel->setText("Shoutout Desk OBS "+state.value("version").toString());
     const auto pending=auth.value("pending").toObject();codeLabel->setText(pending.value("code").toString());codeLabel->setVisible(!pending.isEmpty());openAuthButton->setVisible(!pending.isEmpty());

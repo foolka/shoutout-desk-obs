@@ -1,4 +1,12 @@
 {
+  "connectionMode": "Підключення",
+  "directMode": "Twitch напряму",
+  "oneInstance": "Для одного каналу запускайте лише один екземпляр автовідміток.",
+  "chooseBot": "Вибрати Streamer.bot.exe",
+  "setupBot": "Налаштувати Streamer.bot",
+  "setupBotHelp": "Спочатку підключіть акаунт стримера у Streamer.bot. Автоналаштування створить локальний міст і резервну копію налаштувань бота.",
+  "closeBot": "Закрийте Streamer.bot через «Вихід», потім знову натисніть «Налаштувати Streamer.bot». OBS закривати не потрібно.",
+  "botReady": "Міст збережено. Підключаємося до Streamer.bot.",
   "restoring":"Відновлюємо вхід…","dockInObs":"Закріпити в OBS",
   "undockFromObs":"Відкріпити від OBS",
   "resetAfterLongClose":"Скидання після закриття OBS",

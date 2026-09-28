@@ -1,79 +1,105 @@
 # Shoutout Desk OBS
 
-[Українська](README.uk.md) · [Русский](README.ru.md) · **English**
+[English](README.md) | [Українська](README.uk.md) | [Русский](README.ru.md)
 
-A local Twitch auto-shoutout plugin with a compact, dark OBS Studio dock. Add streamers to a list; their first chat message after your cooldown queues an official Twitch shoutout.
+Automatic Twitch shoutouts inside a dockable OBS Studio panel. A person from your list is shouted out when they write in chat after their cooldown expires.
 
-## Requirements
+**[Download and install](https://github.com/foolka/shoutout-desk-obs/releases/latest)**: Windows EXE + ZIP.
 
-- Windows 10/11 x64, OBS Studio 32.x with Qt 6.8 or newer. Other platforms are not supported yet.
-- Your own Twitch broadcaster account. Internet access to Twitch is required.
-- Only **one** auto-shoutout instance per channel: disable the desktop/cloud version before enabling this plugin.
+![Shoutout Desk OBS](docs/screenshots/people.png)
 
-## Install
+Screenshots use fictional accounts. No personal profiles are included.
 
-1. Download `shoutout-desk-obs-VERSION-windows-x64-setup.exe` from [Releases](https://github.com/foolka/shoutout-desk-obs/releases).
-2. Close OBS completely and run the EXE. Choose English, Ukrainian or Russian, approve the Windows administrator prompt, confirm the detected OBS folder and click Install.
-3. Open OBS → **Docks → Shoutout Desk**. Dock or float the panel wherever you prefer.
+## Contents
 
-The button next to Reconnect switches between **Undock from OBS** (arrow icon) and **Dock in OBS** (panel icon). It works even when dock dragging is locked and returns to the previous dock area, or the right side if none is available. To drag panels manually, turn off **Docks → Lock Docks**. Other docks are not unlocked by the plugin.
+- [Download and install](#install)
+- [Setup](#setup)
+- [Settings and controls](#settings)
+- [Updates and portable mode](#updates)
+- [Data and privacy](#privacy)
+- [Screenshots](#screenshots)
+- [Build from source](#build)
 
-The EXE contains all plugin dependencies; users do not need Node.js, Streamer.bot or developer tools. It checks the OBS/Qt versions and refuses installation or removal while OBS is running. It never closes OBS, starts a stream, launches OBS or reboots the computer. It installs only into `C:\ProgramData\obs-studio\plugins\shoutout-desk-obs` and adds a Windows uninstall entry. OBS/Qt libraries, scenes, sources and stream settings are not replaced. Portable OBS is not supported. Twitch sign-in happens separately inside OBS, not in the installer.
+<a id="install"></a>
+## Download and install
 
-The full ZIP with `Install.cmd` remains available as an alternative. Extract the whole archive, close OBS and run `Install.cmd` (as administrator if required). It verifies package SHA-256 hashes before copying files.
+Windows 10/11 x64, OBS Studio 32+ with Qt 6.8+. Download **setup.exe** from Releases, close OBS, then run the installer and confirm the administrator prompt. Select your OBS folder if it is not detected. Open OBS from your usual shortcut, then **Docks > Shoutout Desk**. The installer never closes OBS or starts a stream.
 
+<a id="setup"></a>
 ## Setup
 
-1. Open **Settings → Sign in with Twitch**. Enter the displayed code at the official Twitch activation page and authorize **your broadcaster account**.
-2. Add Twitch names or channel links in **People** and set the per-person cooldown (1–168 hours). Auto-shoutouts are enabled on every OBS launch and after a new sign-in. Unchecking **Enabled** pauses them for the current session; the next launch enables them again without resetting cooldowns.
-3. The plugin listens while OBS is open. Shoutouts are sent only while Twitch reports your channel live. Hiding the dock does not stop the worker; closing OBS does.
+1. In Settings choose **Twitch directly** or **Streamer.bot**.
+2. Direct: press **Sign in with Twitch**, confirm the code on the official Twitch page, and allow access to your own broadcaster account. A Public Client ID is already included; no registration is needed.
+3. Streamer.bot: first sign in to Twitch as the broadcaster in Streamer.bot 1.0.7. Press **Set up Streamer.bot**; the running copy is detected, or select its EXE. If asked, exit the bot from its tray menu and press the setup button again. The bot is restarted after setup. OBS does not need to close.
+4. Add Twitch nicknames or profile links. When your channel is live, a fresh message from a listed person can queue a shoutout.
 
-The public build includes a shared **Public Client ID**. No client secret is needed. Fork maintainers must register their own application in [Twitch Developer Console](https://dev.twitch.tv/console/apps), select **Public / Chat Bot**, add `http://localhost` as the required redirect placeholder (device login does not use it), and replace `data/twitch-client.json`. Do not share one client ID between different applications.
+Run **one active instance per channel**: either this app or the OBS plugin. Separate computers do not share cooldown databases. A shoutout observed from another bot updates the local cooldown and cancels a queued duplicate. Events must reach this instance; this cannot reconstruct shoutouts from before it was connected.
 
-Permissions: `user:read:chat` and `moderator:manage:shoutouts`. The latter is Twitch's permission name; the plugin only operates on the signed-in broadcaster's own channel. It cannot select a moderated channel. Twitch's stream-key, email, subscription and financial permissions are not requested.
+<a id="settings"></a>
+## Settings and controls
 
-## Updates And Data
+| Control | Action |
+| --- | --- |
+| Enabled | Pause/resume automation for this run. It is enabled again on every launch; this does not reset personal cooldowns. |
+| Cooldown, 1–168 hours | Minimum interval per person in this channel. Default: 24 h. Expiry alone sends nothing: a new chat message is required. |
+| Reset after long shutdown | Off by default. If closed for strictly more than 60 minutes, reset personal cooldowns on next launch. History remains. Crash recovery includes a 30-second heartbeat allowance. |
+| Reset all cooldowns | Requires confirmation. Resets this channel only, keeps people/history and clears queued work. Twitch limits and the local global gap still apply. |
+| Connection method | Switch between local Streamer.bot and direct Twitch. Your channel data stays. Another account has its own list and history. |
+| Sign in / sign out | Connect your broadcaster account. Sign out removes saved Twitch authorization, not the list/history. |
+| Set up Streamer.bot | Backs up actions/settings in the bot's backup directory; installs an authenticated local bridge and enables WebSocket autostart. Preserves its port/password and other actions. Unknown schemas/public bindings are refused. OBS and desktop bridges use different action IDs. |
+| Reconnect | Re-establish the selected connection. Does not replay old chat or reset cooldowns. |
+| Add / X | Add a nickname or Twitch profile URL; X removes it from the active list, preserving history/cooldown. Duplicates are merged. |
+| Search / sort / date | Filter visible people by nickname/date added; sort newest, oldest or name. Does not change who is enabled. |
+| History / Add | Shows outcomes and errors. Add restores a person missing from the list without issuing a shoutout. |
+| Import | Merge a JSON export or an old shoutouts.sqlite from the same channel. Sign in/connect first. Back up before merging; pause automation. Pending requests are not replayed. Close the source program before copying SQLite. |
+| Export | Write a new JSON file with this channel's people, history, cooldown data. No tokens, passwords or bot connection secrets. |
+| Data folder | Open the active profile, including automatic backups. Do not publish its contents. |
+| Language | English, Ukrainian or Russian. Some diagnostic messages may remain Russian. |
+| Check for updates | Manual GitHub release check. A newer stable release can be opened in your browser. No silent downloads or installation. Twitch credentials are not sent to GitHub. |
+| Dock / undock | Header button switches floating/docked mode. Drag the panel to an OBS dock area. OBS controls panel visibility and layout. |
 
-**Reset after closing OBS** is off by default. When enabled, the next launch resets personal plugin cooldowns only if OBS was closed for more than 60 minutes. A running OBS does not count as time closed. After an abnormal exit, the last heartbeat plus a 30-second grace period is used. The first launch has no previous session to reset.
+**Outcomes:** Sent = confirmed by Twitch; Queued/Sending = pending; Skipped = cancelled or no longer eligible; Error = definite rejection; Unconfirmed = outcome unknown, so automatic resend is blocked for the personal cooldown. There is a 10-second settling window for other bots' events and a 125-second local gap between channel shoutouts. No stream is started by this software.
 
-**Reset all cooldowns** asks for confirmation (No by default). Both resets preserve people and history, cancel pending requests and require a new chat message. Twitch's own rate limits and the global safety gap remain. Neither reset starts a broadcast or immediately sends shoutouts.
+<a id="updates"></a>
+## Updates and portable mode
 
-- Click **Settings → Check for updates**, download the new setup EXE, close OBS and run it over the existing version. Do not uninstall first. The ZIP alternative also works; never replace just the DLL.
-- Data lives separately in `%LOCALAPPDATA%\Shoutout Desk OBS`. Updating or reinstalling plugin files does not erase it.
-- Before opening an existing database with a new plugin version, a consistent SQLite backup (including WAL) and encrypted sign-in backup are saved under `backups`. If backup fails, startup stops.
-- The ZIP installer keeps previous plugin files under `%PROGRAMDATA%\ShoutoutDeskOBS-install-backups`. The EXE uses the standard Windows installer/uninstaller instead. Keep the matching data backup when rolling back across a future database migration.
-- To remove an EXE installation, close OBS and uninstall **Shoutout Desk OBS** from Windows Installed apps. Personal data, including saved sign-in, is deliberately retained for reinstallation. Sign out in the plugin before uninstalling if you do not want to retain the active token; to revoke backups too, use Twitch Connections.
-- **Import / Export** transfers lists, history and cooldowns, never OAuth tokens. Import can read a Shoutout Desk desktop `shoutouts.sqlite` from the same account, including history previously imported from Voice. It creates a backup, merges rather than deletes, and pauses automation until you enable it or restart OBS. Close the desktop app first.
-- **Sign out** forgets the active local sign-in. To invalidate all copies (including backups), disconnect the application in [Twitch Connections](https://www.twitch.tv/settings/connections).
+Use **Check for updates**, close OBS and run the new installer. The normal profile remains `%LOCALAPPDATA%\Shoutout Desk OBS`. Uninstalling the plugin leaves this profile intact.
 
-## Reliability And Privacy
+**ZIP / manual install:** extract everything and run `Install.cmd` as administrator for normal OBS. It validates package hashes and keeps a backup of the previous plugin files.
 
-Twitch tokens are protected with Windows DPAPI for the current Windows user. There is no website backend, telemetry, listening TCP port or Streamer.bot connection. The dock starts a bundled Node.js worker over private process pipes; the worker exits when OBS closes. Chat message text is not stored. Lists/history are ordinary local SQLite data, not encrypted. Protect your Windows account and private backups.
+**Portable OBS:** use the same ZIP and `Install-Portable.cmd`, selecting portable OBS's `bin\64bit\obs64.exe`. Enable OBS portable mode first with an empty `portable_mode.txt` in its root. The plugin lives in `obs-plugins\64bit` and `data\obs-plugins`; its separate profile is `config\shoutout-desk-obs` inside portable OBS. Repeat the same installer to update while OBS is closed. Keep `config`; use Export/Import to migrate lists. Windows-protected login requires reauthorization on a different PC. Avoid installing both common and manual copies into the same OBS installation.
 
-The queue respects a 125-second global gap, your per-person cooldown, external official shoutouts, a 10-second settling window and duplicate chat events. Old pending messages are cancelled after restart; an unconfirmed send is not blindly retried. Lost Twitch events or simultaneous independent bots mean absolute prevention of duplicates cannot be guaranteed. A plain bot chat link is not an official shoutout event.
+<a id="privacy"></a>
+## Data and privacy
 
-No updates are installed automatically. Update checks contact GitHub only when clicked and do not include Twitch tokens. Setup EXEs and archives are not Authenticode-signed; Windows may display an unknown-publisher warning. SHA-256 checks detect corruption, not publisher identity. Obtain releases only from this repository.
+Everything runs locally. No account on our server is created. Twitch sign-in uses the official Device Code flow with `user:read:chat` and `moderator:manage:shoutouts`; the latter is the API permission name, not a moderator mode. OAuth tokens and bridge credentials are encrypted with Windows protection. JSON exports contain public nicknames and activity timestamps; share them only intentionally. Twitch receives chat subscriptions/shoutout requests; GitHub is contacted when you check updates. Backups remain local.
 
-## Development
+EXE/ZIP binaries are attached to **GitHub Releases**, not committed into source history. These builds are not code-signed; Windows may show a reputation warning. Check the repository and SHA256 rather than disabling system protection.
 
-Node.js 24.14+, Visual Studio C++ Build Tools (2019 16.7+ or 2022), Windows SDK and CMake 3.20+ are required.
+<a id="screenshots"></a>
+## Screenshots
+
+![Setup](docs/screenshots/streamerbot.png)
+
+![Settings and controls](docs/screenshots/settings-data.png)
+
+![Screenshots: history](docs/screenshots/history.png)
+
+<a id="build"></a>
+## Build from source
+
+Windows x64, Node.js 24.14+, Visual Studio C++ Build Tools, Qt SDK (`QT_SDK` optional), Inno Setup 6.7.3 (`ISCC_EXE`).
 
 ```powershell
-npm ci --ignore-scripts
-npm run build
+npm ci
+npm run audit:source
 npm test
+npm run build
 npm run package
+$env:ISCC_EXE = 'C:\Tools\Inno Setup 6\ISCC.exe'
 npm run installer
 ```
 
-The build script downloads a pinned SHA-256-verified official OBS Qt SDK. `QT_SDK` and `CMAKE_EXE` can override local tool paths. Packaging includes a checksum-verified Node 24.14.0 runtime and production dependencies. `shoutout-preview.exe <packaged-plugin-data-directory> <screenshots-directory>` runs an offline preview using temporary data, never sends a Twitch request, and exits after screenshots. Point `PATH`/`QT_PLUGIN_PATH` to your OBS Qt runtime to launch it.
+GPL-2.0-or-later. [License](LICENSE) · [Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-EXE builds require [Inno Setup 6.7.3 or newer](https://jrsoftware.org/isdl.php); set `ISCC_EXE` for a nonstandard compiler location. The builder verifies every payload hash, rejects unlisted/private files and emits an EXE plus `.sha256`. CI downloads a pinned, checksum-verified compiler. `tools/installer.iss` has a compile-time `TestRoot` option for isolated, non-admin installation/removal tests; this is not enabled in public builds and cannot be selected by a command-line switch at install time. Public installation requires the standard plugin path, even with `/DIR`. `/OBSROOT=` can select a nonstandard OBS installation for scripted testing.
-
-Run `tools/test-installer.ps1 -Compiler <ISCC.exe> -ObsRoot <OBS-folder>` with OBS closed to check fresh install, in-place repair and uninstall in a unique `.test-data` directory. Add `-PreviousPackage <old-unpacked-ZIP>` to check upgrading a legacy ZIP installation. `-ExpectBlocked` instead checks that an open OBS blocks installation without writing plugin files. These tests never install into the live OBS folder, register an uninstaller in Windows, open a personal profile, launch OBS or send Twitch requests.
-
-The native dock uses the public OBS frontend C ABI and Qt Widgets; the worker uses Twurple and SQLite. See [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), and [third-party notices](THIRD_PARTY_NOTICES.md). GPL-2.0-or-later. Not affiliated with Twitch or OBS Project.
-
-### Release Status
-
-Initial public preview. Native loading and the dock were checked in OBS 32.2.2 with Qt 6.11.1. Automated tests use fake Twitch responses and isolated databases; a real OAuth and live-channel shoutout acceptance test must be completed before calling a release production-tested. No test starts a broadcast.
+Technical references: [Twitch OAuth](https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/#device-code-grant-flow), [Streamer.bot WebSocket](https://docs.streamer.bot/api/websocket), [OBS portable mode](https://obsproject.com/kb/portable-mode).

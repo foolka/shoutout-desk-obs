@@ -54,7 +54,7 @@ class Store {
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   prefs() {
-    const out = { cooldownHours: 24, enabled: true, resetAfterLongClose: false };
+    const out = { cooldownHours: 24, enabled: true, resetAfterLongClose: false, provider:'direct' };
     for (const row of this.db.prepare('SELECT * FROM preferences').all()) {
       if (Object.hasOwn(out, row.key)) out[row.key] = JSON.parse(row.value);
     }
@@ -66,6 +66,8 @@ class Store {
         if (!Number.isInteger(value) || value < 1 || value > 168) throw Error('Интервал: от 1 до 168 часов.');
       } else if (key === 'enabled' || key === 'resetAfterLongClose') {
         if (typeof value !== 'boolean') throw Error('Некорректное значение настройки.');
+      } else if(key==='provider') {
+        if(!['bot','direct'].includes(value))throw Error('Некорректный способ подключения.');
       } else throw Error('Неизвестная настройка.');
     }
     this.db.exec('BEGIN IMMEDIATE');

@@ -1,4 +1,12 @@
 {
+  "connectionMode": "Connection",
+  "directMode": "Twitch directly",
+  "oneInstance": "Use only one active auto-shoutout instance per channel.",
+  "chooseBot": "Select Streamer.bot.exe",
+  "setupBot": "Set up Streamer.bot",
+  "setupBotHelp": "Connect your broadcaster account in Streamer.bot first. Setup creates a local bridge and a backup of the bot settings.",
+  "closeBot": "Close Streamer.bot using Exit, then press Set up Streamer.bot again. OBS can stay open.",
+  "botReady": "Bridge saved. Connecting to Streamer.bot.",
   "restoring":"Restoring sign-in…","dockInObs":"Dock in OBS",
   "undockFromObs":"Undock from OBS",
   "resetAfterLongClose":"Reset after closing OBS",

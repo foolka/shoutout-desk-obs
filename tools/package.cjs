@@ -35,8 +35,10 @@ async function main(){
   if(!license.includes('Copyright'))throw Error('Cannot retrieve Node license.');
   fs.writeFileSync(path.join(data,'runtime/LICENSE'),license);
   for(const file of ['README.md','README.ru.md','README.uk.md','LICENSE','THIRD_PARTY_NOTICES.md','CHANGELOG.md'])copy(path.join(root,file),path.join(release,file));
+  fs.cpSync(path.join(root,'docs'),path.join(release,'docs'),{recursive:true});
   copy(path.join(root,'tools/Install.ps1'),path.join(release,'Install.ps1'));
   copy(path.join(root,'tools/Install.cmd'),path.join(release,'Install.cmd'));
+  for(const file of ['Install-Portable.cmd','Install-Portable.ps1'])copy(path.join(root,'tools',file),path.join(release,file));
   const hashes=files(plugin).sort().map(file=>({path:path.relative(release,file).split(path.sep).join('/'),sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}));
   fs.writeFileSync(path.join(release,'manifest.json'),JSON.stringify({version,platform:'windows-x64',files:hashes},null,2));
   console.log(release);

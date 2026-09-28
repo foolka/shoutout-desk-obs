@@ -60,7 +60,9 @@ private:
     QCheckBox *enabled = nullptr, *resetAfterLongClose = nullptr;
     QTabWidget *tabs = nullptr;
     QLineEdit *addEdit = nullptr, *search = nullptr, *historySearch = nullptr, *clientEdit = nullptr;
-    QComboBox *sort = nullptr, *languages = nullptr;
+    QComboBox *sort = nullptr, *languages = nullptr, *provider = nullptr;
+    QWidget *directSettings = nullptr, *botSettings = nullptr;
+    QLineEdit *botPath = nullptr;
     QDateEdit *since = nullptr;
     QSlider *hours = nullptr;
     QWidget *peopleBox = nullptr, *historyBox = nullptr;
@@ -83,6 +85,7 @@ private:
     QDockWidget *hostDock() const;
     void toggleDocking();
     void updateDockButton();
+    void setupBot(const QString &path);
     void openUrl(const QString &url);
     QIcon icon(const QString &name) const;
     QToolButton *tool(const QString &name, const QString &tooltip);

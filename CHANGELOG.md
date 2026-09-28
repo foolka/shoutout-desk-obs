@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 - 2026-09-28
+
+- Add direct Twitch / Streamer.bot connection selection and one-button local bridge setup.
+- Keep the desktop bridge separate and protect bot connection secrets with Windows DPAPI.
+- Add a ZIP installer for portable OBS with a separate profile under its config directory.
+- Expand all three READMEs with control-by-control instructions and offline UI screenshots.
+- Preserve people, history, sign-in and cooldowns during updates.
+
 ## 0.1.4 - 2026-09-28
 
 - Add a self-contained Windows EXE installer in English, Ukrainian and Russian.

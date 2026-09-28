@@ -1,6 +1,6 @@
 const fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
-const top=new Set(['src','core','data','tools','tests','.github','README.md','README.ru.md','README.uk.md','LICENSE','THIRD_PARTY_NOTICES.md','SECURITY.md','CONTRIBUTING.md','CHANGELOG.md','CMakeLists.txt','package.json','package-lock.json','worker.cjs','.gitignore','.gitattributes']);
+const top=new Set(['src','core','data','docs','tools','tests','.github','README.md','README.ru.md','README.uk.md','LICENSE','THIRD_PARTY_NOTICES.md','SECURITY.md','CONTRIBUTING.md','CHANGELOG.md','CMakeLists.txt','package.json','package-lock.json','worker.cjs','.gitignore','.gitattributes']);
 const failures=[];
 function scan(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
   const file=path.join(dir,entry.name),rel=path.relative(root,file);
