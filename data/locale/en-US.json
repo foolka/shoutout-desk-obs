@@ -1,4 +1,11 @@
 {
+"reauthRequired":"Twitch sign-in required",
+"retryingAuth":"Twitch is unreachable. Retrying automatically; sign-in is saved.",
+"signInAgain":"Sign in to Twitch again",
+"reauthTitle":"Shoutout Desk: Twitch sign-in required",
+"reauthBody":"Twitch rejected the saved sign-in. Auto-shoutouts cannot run until you sign in again. Your people, history and cooldowns are preserved. OBS and your stream continue running.",
+"openSettings":"Open settings",
+"later":"Later",
 "raidShoutouts":"Automatic raid shoutouts",
 "raidHelp":"Waits 20 seconds after a raid, including streamers outside your list. An observed Twitch shoutout from another bot cancels the duplicate. Cooldowns and Twitch limits still apply.",
 "autoUpdates":"Notify about new versions",

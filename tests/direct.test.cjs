@@ -79,7 +79,7 @@ test('token refresh persists after closing wizard; stale refresh after logout is
   class Provider{
     constructor(options){assert.deepEqual(options,{clientId:CLIENT});provider=this;}
     onRefresh(cb){this.refresh=cb;} onRefreshFailure(cb){this.failure=cb;}
-    async addUserForToken(){return 'actor';} async getAccessTokenForUser(){return token;}
+    addUser(){} async refreshAccessTokenForUser(){return token;} async getAccessTokenForUser(){return token;}
   }
   const {auth,writes}=authFixture(t,{RefreshingAuthProvider:Provider});auth.saved=saved();await auth.getProvider();auth.cancel();
   provider.refresh('actor',{...token,refreshToken:'rotated'});assert.equal(writes.at(-1).token.refreshToken,'rotated');
@@ -87,13 +87,13 @@ test('token refresh persists after closing wizard; stale refresh after logout is
 });
 test('failed refresh closes authorization until a new login',async t=>{
   let provider;
-  class Provider{constructor(){provider=this;}onRefresh(){}onRefreshFailure(cb){this.failure=cb;}async addUserForToken(){return 'actor';}async getAccessTokenForUser(){return token;}}
-  const {auth}=authFixture(t,{RefreshingAuthProvider:Provider});auth.saved=saved();await auth.getProvider();provider.failure();assert.equal(auth.invalid,true);await assert.rejects(auth.getProvider());
+  class Provider{constructor(){provider=this;}onRefresh(){}onRefreshFailure(cb){this.failure=cb;}addUser(){}async refreshAccessTokenForUser(){return token;}async getAccessTokenForUser(){return token;}}
+  const {auth}=authFixture(t,{RefreshingAuthProvider:Provider});auth.saved=saved();await auth.getProvider();provider.failure('actor',{statusCode:400,body:{message:'Invalid refresh token'}});assert.equal(auth.invalid,true);await assert.rejects(auth.getProvider());
 });
 test('logout during provider initialization cannot restore the old session',async t=>{
   let resolve;
-  class Provider{onRefresh(){}onRefreshFailure(){}addUserForToken(){return new Promise(r=>resolve=r);}async getAccessTokenForUser(){return token;}}
-  const {auth,writes}=authFixture(t,{RefreshingAuthProvider:Provider});auth.saved=saved();const pending=auth.getProvider();await new Promise(setImmediate);auth.logout();resolve('actor');await assert.rejects(pending);assert.equal(writes.at(-1),null);assert.equal(auth.saved,null);
+  class Provider{onRefresh(){}onRefreshFailure(){}addUser(){}async refreshAccessTokenForUser(){return token;}async getAccessTokenForUser(){return token;}}
+  const {auth,writes}=authFixture(t,{RefreshingAuthProvider:Provider,getTokenInfo:()=>new Promise(r=>resolve=r)});auth.saved=saved();const pending=auth.getProvider();await new Promise(setImmediate);auth.logout();resolve({userId:'actor',clientId:CLIENT,scopes:SCOPES});await assert.rejects(pending);assert.equal(writes.at(-1),null);assert.equal(auth.saved,null);
 });
 function directFixture(t,{role='streamer',channel='actor',moderated=['channel'],response=204,live=true}={}){
   let listener;const requests=[],observed=[],subs=[];let refreshes=0;

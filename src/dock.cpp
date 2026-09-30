@@ -85,6 +85,8 @@ void ShoutoutDock::resizeEvent(QResizeEvent *event){
 }
 void ShoutoutDock::stop() {
     if(stopped)return;stopped=true;
+    if(authNoticeTimer)authNoticeTimer->stop();
+    if(authWarning)delete authWarning.data();
     if(worker && worker->state()!=QProcess::NotRunning){
         worker->write("{\"id\":999999999,\"method\":\"quit\"}\n");worker->closeWriteChannel();
         if(!worker->waitForFinished(1800)){worker->kill();worker->waitForFinished(1000);}
@@ -260,6 +262,39 @@ void ShoutoutDock::readWorker(){
     }
 }
 void ShoutoutDock::showError(const QString &message){notice->setText(message);notice->show();}
+void ShoutoutDock::checkAuthNotice(){
+    const auto auth=state.value("auth").toObject();
+    const bool required=state.value("prefs").toObject().value("provider").toString()!="bot"&&auth.value("reauthRequired").toBool();
+    if(!required){
+        if(authNoticeTimer)authNoticeTimer->stop();
+        if(authWarning)authWarning->close();
+        if(auth.value("status")=="ready"||auth.value("status")=="signed_out")authNotified=false;
+        return;
+    }
+    if(authNotified)return;
+    if(!authNoticeTimer){
+        authNoticeTimer=new QTimer(this);authNoticeTimer->setSingleShot(true);
+        connect(authNoticeTimer,&QTimer::timeout,this,[this]{showAuthNotice();});
+    }
+    if(!authNoticeTimer->isActive())authNoticeTimer->start(1500);
+}
+void ShoutoutDock::showAuthNotice(){
+    if(stopped||authNotified||!state.value("auth").toObject().value("reauthRequired").toBool()||state.value("prefs").toObject().value("provider")=="bot")return;
+    auto container=hostDock();QWidget *owner=container?container->parentWidget():window();
+    if(!owner||!owner->isVisible()){authNoticeTimer->start(1000);return;}
+    authNotified=true;
+    auto box=new QMessageBox(QMessageBox::Warning,t("reauthTitle"),t("reauthBody"),QMessageBox::NoButton,owner);
+    authWarning=box;box->setObjectName("shoutoutReauthNotice");box->setAttribute(Qt::WA_DeleteOnClose);
+    box->setTextFormat(Qt::PlainText);box->setWindowModality(Qt::NonModal);
+    auto settings=box->addButton(t("openSettings"),QMessageBox::ActionRole);
+    auto later=box->addButton(t("later"),QMessageBox::RejectRole);box->setDefaultButton(later);box->setEscapeButton(later);
+    connect(box,&QMessageBox::buttonClicked,this,[this,settings](QAbstractButton *clicked){
+        if(clicked!=settings)return;
+        if(auto host=hostDock()){host->show();host->raise();}else show();
+        tabs->setCurrentIndex(2);
+    });
+    box->show();
+}
 void ShoutoutDock::setupBot(const QString &file){
     command("botSetup",{{"exe",file}},[this](QJsonValue value){
         if(value.toObject().value("needsClose").toBool())QMessageBox::information(this,t("setupBot"),t("closeBot"));
@@ -297,7 +332,8 @@ void ShoutoutDock::openUrl(const QString &value){
 void ShoutoutDock::render(){
     painting=true;
     auto account=state.value("account").toObject(),auth=state.value("auth").toObject(),prefs=state.value("prefs").toObject();
-    const bool logged=!auth.value("user").isNull()&&!auth.value("user").toObject().isEmpty();
+    const bool saved=!auth.value("user").isNull()&&!auth.value("user").toObject().isEmpty();
+    const bool needsLogin=auth.value("reauthRequired").toBool(),logged=saved&&!needsLogin;
     const bool bot=prefs.value("provider").toString()=="bot";
     provider->setCurrentIndex(bot?1:0);directSettings->setVisible(!bot);botSettings->setVisible(bot);
     if(botPath->text().isEmpty())botPath->setText(state.value("botPath").toString());
@@ -311,14 +347,15 @@ void ShoutoutDock::render(){
     updateBanner->setText(t("updateBanner").arg(release.value("version").toString()));
     hours->setValue(prefs.value("cooldownHours").toInt(24));hoursLabel->setText(t("hours").arg(hours->value()));
     const bool connected=state.value("connected").toBool(),live=state.value("live").toBool();
-    connection->setText(preview?t("demo"):connected?(live?t("live"):t("offline")):(bot?state.value("botConfigured").toBool():logged)?t("connecting"):t("notConnected"));
-    authLabel->setText(auth.value("message").toString().isEmpty()?(logged?"@"+auth.value("user").toObject().value("login").toString():t("notConnected")):auth.value("message").toString());
+    connection->setText(!bot&&needsLogin?t("reauthRequired"):preview?t("demo"):connected?(live?t("live"):t("offline")):(bot?state.value("botConfigured").toBool():logged)?t("connecting"):t("notConnected"));
+    const auto authStatus=auth.value("status").toString();
+    authLabel->setText(needsLogin?t("reauthRequired"):authStatus=="restoring"?t("restoring"):authStatus=="retrying"?t("retryingAuth"):auth.value("message").toString().isEmpty()?(logged?"@"+auth.value("user").toObject().value("login").toString():t("notConnected")):auth.value("message").toString());
     versionLabel->setText("Shoutout Desk OBS "+state.value("version").toString());
     const auto pending=auth.value("pending").toObject();codeLabel->setText(pending.value("code").toString());codeLabel->setVisible(!pending.isEmpty());openAuthButton->setVisible(!pending.isEmpty());
-    loginButton->setVisible(!logged);logoutButton->setVisible(logged);clientEdit->setVisible(!logged&&!state.value("clientConfigured").toBool());
+    loginButton->setVisible(!logged&&pending.isEmpty());loginButton->setText(t(needsLogin?"signInAgain":"login"));logoutButton->setVisible(saved);clientEdit->setVisible(!logged&&!state.value("clientConfigured").toBool());
     if(!state.value("notice").toString().isEmpty())showError(state.value("notice").toString());
     summary->setText(t("summary").arg(state.value("people").toArray().size()).arg(state.value("queue").toInt()).arg(prefs.value("cooldownHours").toInt(24)));
-    painting=false;renderPeople();renderHistory();
+    painting=false;renderPeople();renderHistory();checkAuthNotice();
 }
 void ShoutoutDock::clearLayout(QLayout *layout){
     if(!layout)return;

@@ -102,6 +102,10 @@ Use **Check for updates**, close OBS and run the new installer. The normal profi
 <a id="privacy"></a>
 ## Data and privacy
 
+### Sign-in Recovery
+
+Network outages, rate limits and temporary Twitch errors retry automatically without signing you out. A saved account name is not proof of a working connection. If Twitch actually rejects authorization, a non-blocking OBS warning appears even with the dock hidden: **Open settings** reveals the sign-in button; **Later** dismisses it for this session. No browser opens automatically. Your people, history and cooldowns stay intact. Temporary outages and Streamer.bot mode do not trigger this warning.
+
 Everything runs locally. No account on our server is created. Twitch sign-in uses the official Device Code flow with `user:read:chat` and `moderator:manage:shoutouts`; the latter is the API permission name, not a moderator mode. OAuth tokens and bridge credentials are encrypted with Windows protection. JSON exports contain public nicknames and activity timestamps; share them only intentionally. Twitch receives chat subscriptions/shoutout requests; GitHub is contacted when you check updates. Backups remain local.
 
 EXE/ZIP binaries are attached to **GitHub Releases**, not committed into source history. These builds are not code-signed; Windows may show a reputation warning. Check the repository and SHA256 rather than disabling system protection.

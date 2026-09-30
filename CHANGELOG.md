@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 - 2026-09-30
+
+- Recover automatically from temporary network, rate-limit and Twitch server errors without requesting login.
+- Persist rotated single-use tokens before validation and serialize concurrent refreshes.
+- Distinguish saved identity from verified authorization and expose the sign-in button when authorization is invalid.
+- Show a non-blocking OBS warning for confirmed invalid authorization even with the dock hidden; open settings or dismiss until next launch.
+- Keep people, history, cooldowns and the existing database schema unchanged.
+
 ## 0.3.0 - 2026-09-30
 
 - Optional incoming-raid shoutouts after at least 20 seconds, including raiders outside the saved list.

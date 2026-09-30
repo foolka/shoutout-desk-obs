@@ -5,6 +5,7 @@
 #include <QProcess>
 #include <QLayout>
 #include <QLockFile>
+#include <QPointer>
 #include <functional>
 #include <memory>
 
@@ -19,6 +20,8 @@ class QTabWidget;
 class QVBoxLayout;
 class QDateEdit;
 class QDockWidget;
+class QMessageBox;
+class QTimer;
 
 class FlowLayout : public QLayout {
 public:
@@ -40,6 +43,7 @@ private:
 };
 
 class ShoutoutDock : public QWidget {
+    friend class ShoutoutDockTest;
 public:
     ShoutoutDock(QString dataRoot, QString profileRoot, bool preview = false, QWidget *parent = nullptr);
     ~ShoutoutDock() override;
@@ -49,6 +53,9 @@ protected:
 private:
     QString dataRoot, profileRoot, language;
     bool preview = false, stopped = false, painting = false;
+    bool authNotified = false;
+    QPointer<QMessageBox> authWarning;
+    QTimer *authNoticeTimer = nullptr;
     QProcess *worker = nullptr;
     std::unique_ptr<QLockFile> lock;
     QByteArray buffer;
@@ -83,6 +90,8 @@ private:
     void renderPeople();
     void renderHistory();
     void showError(const QString &message);
+    void checkAuthNotice();
+    void showAuthNotice();
     QDockWidget *hostDock() const;
     void toggleDocking();
     void updateDockButton();

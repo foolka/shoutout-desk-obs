@@ -3,6 +3,7 @@ const {loadSdk,safeError,publicError}=require('./twitch-auth.cjs');
 class DirectBridge extends EventEmitter {
   constructor({auth,target,store,sdk=loadSdk,fetchImpl=globalThis.fetch}){
     super();Object.assign(this,{auth,target,store,sdk,fetchImpl});this.closed=false;this.active=new Set();this.epoch=0;
+    this.authRetry=message=>this.reset(message);auth.on?.('retry',this.authRetry);
   }
   async connect(){
     const epoch=++this.epoch;
@@ -20,7 +21,11 @@ class DirectBridge extends EventEmitter {
         this.active.add(sub);if(this.active.has(chat)&&this.active.has(shoutout)&&this.active.has(raid)){this.ready=true;clearTimeout(this.connectTimer);this.emit('ready');}
       });
       listener.onSubscriptionCreateFailure((_sub,error)=>this.fail(safeError(error),epoch));
-      listener.onRevoke(()=>this.fail('Twitch отозвал доступ. Войдите снова и проверьте права на канал.',epoch,false));
+      listener.onRevoke((_sub,status)=>{
+        if(this.closed||epoch!==this.epoch)return;
+        if(['authorization_revoked','user_removed'].includes(status))this.auth.invalidate('Twitch отозвал доступ. Войдите через Twitch снова.');
+        this.fail('Подписка Twitch остановлена: '+status,epoch,false);
+      });
       listener.onUserSocketDisconnect(()=>{if(!this.closed&&epoch===this.epoch){this.ready=false;this.active.clear();this.emit('offline','Переподключение к Twitch');}});
       chat=listener.onChannelChatMessage(this.target.id,this.actor,event=>{
         if(!this.ready||this.closed||epoch!==this.epoch)return;
@@ -40,7 +45,7 @@ class DirectBridge extends EventEmitter {
   fail(message,epoch=this.epoch,retry=true){
     if(this.closed||epoch!==this.epoch)return;
     this.epoch++;this.ready=false;clearTimeout(this.connectTimer);this.listener?.stop();this.emit('offline',message);
-    clearTimeout(this.timer);if(retry){this.timer=setTimeout(()=>void this.connect(),15000);this.timer.unref?.();}
+    clearTimeout(this.timer);if(retry&&!this.auth.invalid){this.timer=setTimeout(()=>void this.connect(),15000);this.timer.unref?.();}
   }
   async call(op,args={}){
     if(this.closed)throw publicError('Подключение закрыто.');
@@ -66,7 +71,7 @@ class DirectBridge extends EventEmitter {
       if(args.canSend&&!args.canSend())return {status:'cancelled',detail:'Шотаут уже сделан в канале или очередь отменена'};
       let response=await post(token.accessToken);
       if(response.status===401){
-        let refreshed;try{refreshed=await this.provider.refreshAccessTokenForUser(this.actor);}catch{return {status:'failed',detail:'Войдите через Twitch заново'};}
+        let refreshed;try{refreshed=await this.provider.refreshAccessTokenForUser(this.actor);}catch(error){return {status:'failed',detail:this.auth.message||safeError(error)};}
         if(this.closed||!this.ready||this.auth.invalid)return {status:'failed',detail:'Подключение закрыто'};
         if(args.canSend&&!args.canSend())return {status:'cancelled',detail:'Шотаут уже сделан в канале или очередь отменена'};
         response=await post(refreshed.accessToken);
@@ -74,12 +79,12 @@ class DirectBridge extends EventEmitter {
       if(response.status===204)return {status:'sent',sentAt:Date.now()};
       if(response.status===429)return {status:'rate_limited'};
       if(response.status>=500)return {status:'unknown'};
-      if(response.status===403)this.fail('Нет права на шотаут в своём канале. Войдите через Twitch заново.',this.epoch,false);
-      if(response.status===401)this.fail('Вход Twitch больше не действителен. Войдите заново.',this.epoch,false);
+      if(response.status===403)this.fail('Twitch запретил шотаут. Проверьте права и ограничения канала.',this.epoch,false);
+      if(response.status===401){this.auth.invalidate('Twitch отклонил обновлённый вход. Войдите через Twitch снова.');this.fail(this.auth.message,this.epoch,false);}
       return {status:'failed',detail:response.status===403?'Нет права на шотаут в этом канале':response.status===400?'Twitch отклонил шотаут: канал не в эфире, нет зрителей или получатель недоступен':'Twitch отклонил запрос: HTTP '+response.status};
     }catch{return {status:'unknown'};}
   }
   reset(reason){this.fail(reason||'Переподключение к Twitch');}
-  close(){this.closed=true;this.epoch++;clearTimeout(this.timer);clearTimeout(this.connectTimer);this.listener?.stop();}
+  close(){this.closed=true;this.epoch++;this.auth.off?.('retry',this.authRetry);clearTimeout(this.timer);clearTimeout(this.connectTimer);this.listener?.stop();}
 }
 module.exports={DirectBridge};
