@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 - 2026-09-30
+
+- Optional incoming-raid shoutouts after at least 20 seconds, including raiders outside the saved list.
+- Observed Twitch shoutouts from other bots cancel queued duplicates; personal cooldowns and Twitch limits still apply.
+- Automatic, non-blocking update checks with a visible release banner. No automatic downloads or installation.
+- Import and migrate the earliest local SQLite databases, preserving people, history and cooldowns.
+- Prominent English, Ukrainian and Russian legacy-import instructions; refreshed localized screenshots.
+- Database schema 3: version backups are created before migration. Use a backup when downgrading.
+
 ## 0.2.0 - 2026-09-28
 
 - Add direct Twitch / Streamer.bot connection selection and one-button local bridge setup.

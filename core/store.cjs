@@ -17,7 +17,7 @@ class Store {
   constructor(file, now = Date.now) {
     this.now = now;
     this.db = new DatabaseSync(file);
-    if(this.db.prepare('PRAGMA user_version').get().user_version>2){this.db.close();throw Error('База создана более новой версией плагина. Обновите плагин или восстановите соответствующую резервную копию.');}
+    if(this.db.prepare('PRAGMA user_version').get().user_version>3){this.db.close();throw Error('База создана более новой версией плагина. Обновите плагин или восстановите соответствующую резервную копию.');}
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS preferences(key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS people(login TEXT PRIMARY KEY, added_at INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1);
@@ -32,7 +32,13 @@ class Store {
       this.db.prepare('INSERT OR IGNORE INTO channel_people SELECT ?,login,added_at,active FROM people').run(this.lastAccount().id);
       this.db.exec('PRAGMA user_version=2');
     }
-    this.db.prepare("UPDATE attempts SET status='cancelled', detail='Перезапуск: ожидаем новое сообщение' WHERE status='queued'").run();
+    if(this.db.prepare('PRAGMA user_version').get().user_version<3){
+      this.db.exec("BEGIN IMMEDIATE");
+      try{
+        this.db.exec("ALTER TABLE attempts ADD COLUMN trigger TEXT NOT NULL DEFAULT 'chat'; ALTER TABLE attempts ADD COLUMN not_before INTEGER NOT NULL DEFAULT 0; PRAGMA user_version=3; COMMIT");
+      }catch(error){this.db.exec('ROLLBACK');throw error;}
+    }
+    this.db.prepare("UPDATE attempts SET status='cancelled', detail='Перезапуск: ожидаем новое событие' WHERE status='queued'").run();
   }
   close() { this.db.close(); }
   lastAccount() {
@@ -58,11 +64,15 @@ class Store {
     for (const row of this.db.prepare('SELECT * FROM preferences').all()) {
       if (Object.hasOwn(out, row.key)) out[row.key] = JSON.parse(row.value);
     }
+    out.raidShoutouts=this.meta('raidShoutouts',false);
+    out.autoUpdates=this.meta('autoUpdates',true);
     return out;
   }
   setPrefs(patch) {
     for (const [key, value] of Object.entries(patch)) {
-      if (key === 'cooldownHours') {
+      if (key === 'raidShoutouts' || key === 'autoUpdates') {
+        if(typeof value!=='boolean')throw Error('Некорректное значение настройки.');
+      } else if (key === 'cooldownHours') {
         if (!Number.isInteger(value) || value < 1 || value > 168) throw Error('Интервал: от 1 до 168 часов.');
       } else if (key === 'enabled' || key === 'resetAfterLongClose') {
         if (typeof value !== 'boolean') throw Error('Некорректное значение настройки.');
@@ -73,6 +83,7 @@ class Store {
     this.db.exec('BEGIN IMMEDIATE');
     try{for(const [key,value] of Object.entries(patch))this.db.prepare('INSERT OR REPLACE INTO preferences VALUES (?,?)').run(key,JSON.stringify(value));this.db.exec('COMMIT');}
     catch(error){this.db.exec('ROLLBACK');throw error;}
+    if(patch.raidShoutouts===false)this.db.prepare("UPDATE attempts SET status='cancelled',detail='Автоотметки рейдов выключены' WHERE status='queued' AND trigger='raid'").run();
     return this.prefs();
   }
   add(input,account=this.lastAccount().id) {
@@ -112,7 +123,8 @@ class Store {
   }
   canSend(id){
     const row=this.db.prepare("SELECT * FROM attempts WHERE id=? AND status='sending'").get(id);
-    if(!row||!this.prefs().enabled||!this.db.prepare('SELECT 1 FROM channel_people WHERE account=? AND login=? AND active=1').get(row.account,row.login))return false;
+    if(!row||!this.prefs().enabled)return false;
+    if(row.trigger==='raid'?!this.prefs().raidShoutouts:!this.db.prepare('SELECT 1 FROM channel_people WHERE account=? AND login=? AND active=1').get(row.account,row.login))return false;
     // Exclude this attempt's own in-flight reservation from the final check.
     if(row.started_at<=this.cooldownResetAt(row.account))return false;
     const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=? AND stamp>?').get(row.account,row.login,this.cooldownResetAt(row.account)).stamp;
@@ -128,14 +140,23 @@ class Store {
       queued:!!this.db.prepare("SELECT 1 FROM attempts WHERE account=? AND login=? AND status IN ('queued','sending')").get(account,p.login)
     }));
   }
-  enqueue(account,input) {
+  enqueue(account,input,trigger='chat') {
     const login = normalizeLogin(input);
+    if(!['chat','raid'].includes(trigger))throw Error('Unknown event');
     this.claimDraft(account);
-    if (!account || !this.prefs().enabled || !this.db.prepare('SELECT 1 FROM channel_people WHERE account=? AND login=? AND active=1').get(account,login)) return null;
+    if (!account || !this.prefs().enabled) return null;
+    if(trigger==='raid'?!this.prefs().raidShoutouts:!this.db.prepare('SELECT 1 FROM channel_people WHERE account=? AND login=? AND active=1').get(account,login))return null;
     if (this.nextAt(account,login) > this.now()) return null;
-    if (this.db.prepare("SELECT 1 FROM attempts WHERE account=? AND login=? AND status IN ('queued','sending')").get(account,login)) return null;
+    const existing=this.db.prepare("SELECT * FROM attempts WHERE account=? AND login=? AND status IN ('queued','sending')").get(account,login);
+    if(existing){
+      if(trigger==='raid'&&existing.trigger==='chat'&&existing.status==='queued'){
+        this.db.prepare("UPDATE attempts SET trigger='raid',not_before=? WHERE id=?").run(this.now()+20000,existing.id);
+        return existing.id;
+      }
+      return null;
+    }
     const id=randomUUID();
-    this.db.prepare("INSERT INTO attempts(id,account,login,created_at,status) VALUES (?,?,?,?,'queued')").run(id,account,login,this.now());
+    this.db.prepare("INSERT INTO attempts(id,account,login,created_at,status,trigger,not_before) VALUES (?,?,?,?,'queued',?,?)").run(id,account,login,this.now(),trigger,trigger==='raid'?this.now()+20000:0);
     return id;
   }
   globalNext(account) {
@@ -148,7 +169,7 @@ class Store {
   take(account,settleMs=0) {
     if (this.globalNext(account)>this.now()) return null;
     this.db.prepare("UPDATE attempts SET status='cancelled',detail='Сообщение устарело' WHERE status='queued' AND created_at<?").run(this.now()-30*60000);
-    const row=this.db.prepare("SELECT * FROM attempts WHERE account=? AND status='queued' AND retry_at<=? AND created_at<=? ORDER BY created_at,rowid LIMIT 1").get(account,this.now(),this.now()-settleMs);
+    const row=this.db.prepare("SELECT * FROM attempts WHERE account=? AND status='queued' AND retry_at<=? AND not_before<=? AND created_at<=? ORDER BY created_at,rowid LIMIT 1").get(account,this.now(),this.now(),this.now()-settleMs);
     if (!row) return null;
     if (this.nextAt(account,row.login)>this.now()) {
       this.finish(row.id,'cancelled','Действует таймаут'); return null;

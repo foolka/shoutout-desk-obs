@@ -2,6 +2,8 @@ param(
     [Parameter(Mandatory=$true)][string]$Compiler,
     [Parameter(Mandatory=$true)][string]$ObsRoot,
     [string]$PreviousPackage,
+    [string]$PackageDirectory,
+    [string]$TestDirectory,
     [switch]$ExpectBlocked
 )
 $ErrorActionPreference='Stop'
@@ -9,6 +11,11 @@ $root=Split-Path $PSScriptRoot -Parent
 $version=(Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
 $package=Join-Path $root "release\shoutout-desk-obs-$version-windows-x64"
 $testRoot=Join-Path $root ('.test-data\installer-'+[Guid]::NewGuid().ToString('N'))
+if($PackageDirectory){$package=[IO.Path]::GetFullPath($PackageDirectory)}
+if($TestDirectory){
+    $testRoot=[IO.Path]::GetFullPath($TestDirectory)
+    if(Test-Path -LiteralPath $testRoot){throw 'Test directory must not exist'}
+}
 New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
 & $Compiler '/Qp' "/DAppVersion=$version" "/DPackageDir=$package" "/DOutputDir=$testRoot" "/DTestRoot=$testRoot" (Join-Path $PSScriptRoot 'installer.iss')
 if($LASTEXITCODE -ne 0){throw 'Test installer compilation failed'}

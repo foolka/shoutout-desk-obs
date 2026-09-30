@@ -18,13 +18,15 @@ function readDesktop(file) {
   try {
     const account = JSON.parse(db.prepare("SELECT value FROM preferences WHERE key='lastAccount'").get()?.value || '{}');
     if (!account.id) throw Error('В базе нет подключённого канала.');
+    const tables=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
+    if(db.prepare('PRAGMA user_version').get().user_version>3)throw Error('База из более новой версии. Сначала обновите приложение.');
     return {
       format:'shoutout-desk-obs', version:1, account,
       cooldownHours:JSON.parse(db.prepare("SELECT value FROM preferences WHERE key='cooldownHours'").get()?.value || '24'),
       cooldownResetAt:JSON.parse(db.prepare('SELECT value FROM preferences WHERE key=?').get('cooldownReset:'+account.id)?.value || '0'),
-      people:db.prepare('SELECT login,added_at,active FROM channel_people WHERE account=?').all(account.id),
+      people:tables.has('channel_people')?db.prepare("SELECT login,added_at,active FROM channel_people WHERE account=? OR account=''").all(account.id):db.prepare('SELECT login,added_at,active FROM people').all(),
       attempts:db.prepare('SELECT * FROM attempts WHERE account=?').all(account.id),
-      observed:db.prepare('SELECT login,stamp FROM observed_shoutouts WHERE account=?').all(account.id)
+      observed:tables.has('observed_shoutouts')?db.prepare('SELECT login,stamp FROM observed_shoutouts WHERE account=?').all(account.id):[]
     };
   } finally { db.close(); }
 }
@@ -43,7 +45,8 @@ function importBundle(store, value, account) {
     if (a.account!==account || typeof a.id!=='string' || !/^[a-zA-Z0-9_:-]{1,128}$/.test(a.id)) throw Error('Некорректная история.');
     if (!['sent','failed','uncertain','cancelled','sending','queued'].includes(a.status)) throw Error('Некорректный статус.');
     if((a.status==='sent'&&a.finished_at==null)||(['sending','uncertain'].includes(a.status)&&a.started_at==null))throw Error('В истории отсутствует время отметки.');
-    return {...a, login:normalizeLogin(a.login), created_at:stamp(a.created_at), started_at:a.started_at==null?null:stamp(a.started_at),
+    if(a.trigger!=null&&!['chat','raid'].includes(a.trigger))throw Error('Некорректный источник отметки.');
+    return {...a, trigger:a.trigger||'chat', login:normalizeLogin(a.login), created_at:stamp(a.created_at), started_at:a.started_at==null?null:stamp(a.started_at),
       finished_at:a.finished_at==null?null:stamp(a.finished_at), detail:String(a.detail||'').slice(0,500),
       status:a.status==='sending'?'uncertain':a.status==='queued'?'cancelled':a.status};
   });
@@ -54,7 +57,7 @@ function importBundle(store, value, account) {
   store.db.exec('BEGIN IMMEDIATE');
   try {
     for (const p of people) store.db.prepare('INSERT INTO channel_people VALUES (?,?,?,?) ON CONFLICT(account,login) DO UPDATE SET active=MAX(active,excluded.active),added_at=MIN(added_at,excluded.added_at)').run(account,p.login,p.added_at,p.active);
-    for (const a of attempts) store.db.prepare('INSERT OR IGNORE INTO attempts(id,account,login,created_at,started_at,finished_at,status,detail) VALUES (?,?,?,?,?,?,?,?)').run(a.id,account,a.login,a.created_at,a.started_at,a.finished_at,a.status,a.detail);
+    for (const a of attempts) store.db.prepare('INSERT OR IGNORE INTO attempts(id,account,login,created_at,started_at,finished_at,status,detail,trigger) VALUES (?,?,?,?,?,?,?,?,?)').run(a.id,account,a.login,a.created_at,a.started_at,a.finished_at,a.status,a.detail,a.trigger);
     for (const o of observed) store.db.prepare('INSERT OR IGNORE INTO observed_shoutouts VALUES (?,?,?)').run(account,o.login,o.stamp);
     // Import never resumes automation or replays old pending requests.
     store.db.prepare('INSERT OR REPLACE INTO preferences VALUES (?,?)').run('enabled','false');

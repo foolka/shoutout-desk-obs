@@ -21,7 +21,7 @@ class Bridge extends EventEmitter {
           if(msg.authentication) await this.request('Authenticate',{authentication:authHash(this.config.password||'',msg.authentication)});
           const actions=await this.request('GetActions');
           if(!actions.actions?.some(a=>a.id===ACTION_ID && a.enabled)) throw Error('Нажмите «Настроить Streamer.bot»: связка не установлена.');
-          await this.request('Subscribe',{events:{Twitch:['ChatMessage','StreamOnline','StreamOffline','ShoutoutCreated'],General:['Custom']}});
+          await this.request('Subscribe',{events:{Twitch:['ChatMessage','StreamOnline','StreamOffline','ShoutoutCreated','Raid'],General:['Custom']}});
           if(!this.closed&&this.ws===ws)this.emit('ready');
         } catch(error) {this.lastError=error.message;this.emit('status',error.message);ws.close();}
       }

@@ -14,10 +14,10 @@ class DirectBridge extends EventEmitter {
       if(this.closed||epoch!==this.epoch)return;
       this.provider=authProvider;this.api=new sdk.ApiClient({authProvider,logger:{minLevel:'error'}});
       const listener=this.listener=new sdk.EventSubWsListener({apiClient:this.api,logger:{minLevel:'error'}});
-      this.active.clear();let chat,shoutout;
+      this.active.clear();let chat,shoutout,raid;
       listener.onSubscriptionCreateSuccess(sub=>{
         if(this.closed||epoch!==this.epoch)return;
-        this.active.add(sub);if(this.active.has(chat)&&this.active.has(shoutout)){this.ready=true;clearTimeout(this.connectTimer);this.emit('ready');}
+        this.active.add(sub);if(this.active.has(chat)&&this.active.has(shoutout)&&this.active.has(raid)){this.ready=true;clearTimeout(this.connectTimer);this.emit('ready');}
       });
       listener.onSubscriptionCreateFailure((_sub,error)=>this.fail(safeError(error),epoch));
       listener.onRevoke(()=>this.fail('Twitch отозвал доступ. Войдите снова и проверьте права на канал.',epoch,false));
@@ -29,6 +29,10 @@ class DirectBridge extends EventEmitter {
       shoutout=listener.onChannelShoutoutCreate(this.target.id,this.actor,event=>{
         if(this.closed||epoch!==this.epoch||event.broadcasterId!==this.target.id)return;
         this.store.observeShoutout(this.target.id,event.shoutedOutBroadcasterName,event.startDate.getTime());this.emit('changed');
+      });
+      raid=listener.onChannelRaidTo(this.target.id,event=>{
+        if(!this.ready||this.closed||epoch!==this.epoch||event.raidedBroadcasterId!==this.target.id)return;
+        this.emit('event','Raid',{raider:{id:event.raidingBroadcasterId,login:event.raidingBroadcasterName},broadcaster:{id:event.raidedBroadcasterId}});
       });
       this.connectTimer=setTimeout(()=>this.fail('Twitch не подтвердил подключение к чату. Повторяем.',epoch),30000);this.connectTimer.unref?.();listener.start();
     }catch(error){this.fail(error.publicMessage||safeError(error),epoch);}

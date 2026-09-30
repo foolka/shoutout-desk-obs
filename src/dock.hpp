@@ -57,7 +57,8 @@ private:
     QJsonObject state, words;
     QLabel *connection = nullptr, *accountLabel = nullptr, *summary = nullptr, *notice = nullptr;
     QLabel *hoursLabel = nullptr, *codeLabel = nullptr, *authLabel = nullptr, *versionLabel = nullptr;
-    QCheckBox *enabled = nullptr, *resetAfterLongClose = nullptr;
+    QCheckBox *enabled = nullptr, *resetAfterLongClose = nullptr, *raidShoutouts = nullptr, *autoUpdates = nullptr;
+    QPushButton *updateBanner = nullptr;
     QTabWidget *tabs = nullptr;
     QLineEdit *addEdit = nullptr, *search = nullptr, *historySearch = nullptr, *clientEdit = nullptr;
     QComboBox *sort = nullptr, *languages = nullptr, *provider = nullptr;

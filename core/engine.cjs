@@ -48,6 +48,17 @@ class Engine {
     if(!user.login || user.shared || user.synthetic || (user.source && user.source!==this.account) || (user.channel && user.channel!==this.account) || user.id===this.account) return;
     try { if(this.store.enqueue(this.account,user.login)) this.onChange(); } catch { /* Invalid chat usernames are ignored. */ }
   }
+  raid(data){
+    if(this.stopped||!this.ready||!this.live||!this.store.prefs().raidShoutouts||data.isTest||data.meta?.isTest||data.meta?.internal||data.isFromSharedChatGuest||data.isSharedChatMessage)return;
+    const account=String(data.broadcaster?.id||'');
+    const raider=data.raider;
+    if((account&&account!==this.account)||!raider?.login||String(raider.id||'')===this.account||raider.login.toLowerCase()===this.channel.toLowerCase())return;
+    if(data.createdAt){
+      const stamp=Date.parse(data.createdAt);
+      if(!Number.isFinite(stamp)||stamp<this.store.now()-60000||stamp>this.store.now()+60000)return;
+    }
+    try{if(this.store.enqueue(this.account,raider.login,'raid'))this.onChange();}catch{ /* Ignore malformed raids. */ }
+  }
   shoutout(data){
     if(this.stopped||data.isTest||data.meta?.isTest||data.isFromSharedChatGuest)return;
     const account=String(data.broadcaster?.id||'');

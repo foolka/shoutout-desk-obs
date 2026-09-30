@@ -124,6 +124,8 @@ void ShoutoutDock::build(){
     enabled=new QCheckBox(t("enabled"));enabled->setEnabled(false);account->addWidget(enabled);
     connect(enabled,&QCheckBox::toggled,this,[this](bool checked){if(!painting)command("prefs",{{"enabled",checked}});});root->addLayout(account);
     notice=label({},"notice");notice->hide();root->addWidget(notice);
+    updateBanner=button({},"download");updateBanner->hide();root->addWidget(updateBanner);
+    connect(updateBanner,&QPushButton::clicked,this,[this]{openUrl(state.value("update").toObject().value("url").toString());});
     tabs=new QTabWidget;tabs->setObjectName("tabs");root->addWidget(tabs,1);
 
     auto people=new QWidget;auto p=column(people);p->setContentsMargins(0,12,0,0);
@@ -190,6 +192,10 @@ void ShoutoutDock::build(){
         const auto answer=QMessageBox::question(this,t("resetCooldowns"),t("resetCooldownsConfirm"),QMessageBox::Yes|QMessageBox::No,QMessageBox::No);
         if(answer==QMessageBox::Yes)command("resetCooldowns",{},[this](QJsonValue){QMessageBox::information(this,t("resetCooldowns"),t("cooldownsReset"));});
     });
+    s->addSpacing(8);
+    raidShoutouts=new QCheckBox(t("raidShoutouts"));s->addWidget(raidShoutouts);
+    connect(raidShoutouts,&QCheckBox::toggled,this,[this](bool checked){if(!painting)command("prefs",{{"raidShoutouts",checked}});});
+    s->addWidget(label(t("raidHelp"),"muted"));
     s->addSpacing(8);s->addWidget(label(t("data"),"section"));
     auto transfer=new QHBoxLayout;auto import=button(t("import"),"upload");auto exportButton=button(t("export"),"download");transfer->addWidget(import);transfer->addWidget(exportButton);s->addLayout(transfer);
     connect(import,&QPushButton::clicked,this,[this]{
@@ -205,6 +211,8 @@ void ShoutoutDock::build(){
     connect(languages,&QComboBox::currentIndexChanged,this,[this](int index){if(!painting)command("language",{{"value",languages->itemData(index).toString()}});});
     s->addSpacing(8);versionLabel=label("Shoutout Desk OBS","muted");s->addWidget(versionLabel);
     auto update=button(t("checkUpdate"),"refresh-cw");s->addWidget(update);
+    autoUpdates=new QCheckBox(t("autoUpdates"));s->addWidget(autoUpdates);
+    connect(autoUpdates,&QCheckBox::toggled,this,[this](bool checked){if(!painting)command("prefs",{{"autoUpdates",checked}});});
     connect(update,&QPushButton::clicked,this,[this,update]{update->setEnabled(false);QPointer<QPushButton> guard(update);command("update",{},[this,guard](QJsonValue v){if(guard)guard->setEnabled(true);auto r=v.toObject();if(r.value("available").toBool()){if(QMessageBox::question(this,t("update"),t("updateAvailable").arg(r.value("version").toString()))==QMessageBox::Yes)openUrl(r.value("url").toString());}else QMessageBox::information(this,t("update"),t("upToDate"));});QTimer::singleShot(15000,update,[update]{update->setEnabled(true);});});
     s->addStretch();tabs->addTab(scrollArea(settings),icon("settings-2"),t("settings"));
     connection=label(t("starting"),"connection");root->addWidget(connection);
@@ -296,6 +304,11 @@ void ShoutoutDock::render(){
     accountLabel->setText(account.value("channel").toString().isEmpty()?t("notConnected"):"@"+account.value("channel").toString());
     enabled->setEnabled((bot?state.value("botConfigured").toBool():logged)||preview);enabled->setChecked(prefs.value("enabled").toBool());
     resetAfterLongClose->setChecked(prefs.value("resetAfterLongClose").toBool());
+    raidShoutouts->setChecked(prefs.value("raidShoutouts").toBool());
+    autoUpdates->setChecked(prefs.value("autoUpdates").toBool(true));
+    const auto release=state.value("update").toObject();
+    updateBanner->setVisible(release.value("available").toBool());
+    updateBanner->setText(t("updateBanner").arg(release.value("version").toString()));
     hours->setValue(prefs.value("cooldownHours").toInt(24));hoursLabel->setText(t("hours").arg(hours->value()));
     const bool connected=state.value("connected").toBool(),live=state.value("live").toBool();
     connection->setText(preview?t("demo"):connected?(live?t("live"):t("offline")):(bot?state.value("botConfigured").toBool():logged)?t("connecting"):t("notConnected"));
@@ -339,7 +352,7 @@ void ShoutoutDock::renderHistory(){
     int count=0,total=0;
     for(auto value:rows){auto row=value.toObject();const auto login=row.value("login").toString();if(!login.contains(historySearch->text(),Qt::CaseInsensitive))continue;total++;if(count>=historyLimit)continue;count++;
         auto item=new QFrame;item->setObjectName("historyRow");auto l=new QHBoxLayout(item);l->setContentsMargins(0,10,0,10);auto details=new QVBoxLayout;details->setSpacing(3);
-        details->addWidget(label(login,"personName"));
+        details->addWidget(label(login+(row.value("trigger").toString()=="raid"?"  ·  "+t("raid"):""),"personName"));
         const auto date=QDateTime::fromMSecsSinceEpoch(row.value("created_at").toInteger()).toString("dd.MM.yyyy  HH:mm");
         const auto status=row.value("status").toString();auto description=label(date+"  ·  "+t(status.toUtf8().constData()),"muted");description->setToolTip(row.value("detail").toString());details->addWidget(description);l->addLayout(details,1);
         if(!people.contains(login)){auto add=tool("user-plus",t("add"));l->addWidget(add);connect(add,&QToolButton::clicked,this,[this,login]{command("add",{{"login",login}});});}

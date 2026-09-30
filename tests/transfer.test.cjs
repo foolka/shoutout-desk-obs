@@ -9,14 +9,14 @@ const {checkUpdate,newer}=require('../core/update.cjs');
 function fixture(t){const s=new Store(':memory:');s.rememberAccount('123','sample');s.setPrefs({enabled:true});t.after(()=>s.close());return s;}
 function temp(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'obs-shoutout-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return dir;}
 test('plugin defaults to direct, accepts bot and excludes moderator settings',()=>{
-  const s=new Store(':memory:');assert.deepEqual(s.prefs(),{cooldownHours:24,enabled:true,resetAfterLongClose:false,provider:'direct'});
+  const s=new Store(':memory:');assert.deepEqual(s.prefs(),{cooldownHours:24,enabled:true,resetAfterLongClose:false,provider:'direct',raidShoutouts:false,autoUpdates:true});
   s.setPrefs({provider:'bot'});assert.equal(s.prefs().provider,'bot');
   for(const key of ['role','provider','startInTray'])assert.throws(()=>s.setPrefs({[key]:'anything'}));s.close();
 });
 
 test('an older plugin refuses a newer database without changing it',t=>{
   const file=path.join(temp(t),'future.sqlite');
-  const db=new DatabaseSync(file);db.exec('PRAGMA user_version=3; CREATE TABLE future_data(value TEXT);');db.close();
+  const db=new DatabaseSync(file);db.exec('PRAGMA user_version=4; CREATE TABLE future_data(value TEXT);');db.close();
   const before=fs.readFileSync(file);
   assert.throws(()=>new Store(file));assert.deepEqual(fs.readFileSync(file),before);
 });

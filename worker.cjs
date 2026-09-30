@@ -10,7 +10,7 @@ const {Bridge}=require('./core/bridge.cjs');
 const {install,runningBots}=require('./core/setup.cjs');
 const {vault,prepareProfile,backupProfile,atomicWrite}=require('./core/vault.cjs');
 const {exportBundle,importBundle,readDesktop}=require('./core/transfer.cjs');
-const {checkUpdate}=require('./core/update.cjs');
+const {UpdateMonitor}=require('./core/update-monitor.cjs');
 const {ObsSession,HEARTBEAT_MS}=require('./core/session.cjs');
 const VERSION=require('./package.json').version;
 
@@ -45,7 +45,7 @@ async function main() {
     const account=store.lastAccount();
     const history=store.history(account.id);
     const people=store.people(account.id);
-    return {version:VERSION,account,auth:auth.view(),prefs:store.prefs(),people,history,notice,
+    return {version:VERSION,account,auth:auth.view(),prefs:store.prefs(),people,history,notice,update:updates.view(),
       connected:!!engine?.ready,live:!!engine?.live,demo,language:store.meta('language','ru-RU'),
       botPath:botConnection?.exe||'',botConfigured:!!botConnection,
       queue:history.filter(h=>['queued','sending'].includes(h.status)).length,
@@ -54,6 +54,7 @@ async function main() {
   }
   let debounce;
   function changed(){clearTimeout(debounce);debounce=setTimeout(()=>emit({event:'state',data:state()}),80);}
+  const updates=new UpdateMonitor(store,VERSION,changed);
   function disconnect(){generation++;engine?.stop();bridge?.close();engine=null;bridge=null;store.cancelQueue('Подключение остановлено');}
   function connect(){
     disconnect();const bot=store.prefs().provider==='bot';
@@ -74,6 +75,7 @@ async function main() {
       if(epoch!==generation)return;
       if(type==='ChatMessage')engine.message(data);
       else if(type==='ShoutoutCreated')engine.shoutout(data);
+      else if(type==='Raid')engine.raid(data);
       else if(['StreamOnline','StreamOffline'].includes(type)&&!data.isTest&&!data.meta?.isTest){
         const account=String(data.broadcaster?.id||data.user?.id||'');
         if(account!==engine.account)return;
@@ -140,11 +142,11 @@ async function main() {
       await backupProfile(dir,'before-import');
       const result=importBundle(store,value,engine?.account||store.lastAccount().id);changed();return result;
     },
-    update:async()=>checkUpdate(VERSION),
+    update:async()=>{if(demo)throw Error('Demo is offline.');return updates.refresh(true);},
     quit:async()=>shutdown()
   };
   function shutdown(){
-    if(closing)return;disconnect();closing=true;auth.dispose();clearTimeout(debounce);clearInterval(tick);clearInterval(refresh);clearInterval(heartbeat);session.close();store.close();process.exit(0);
+    if(closing)return;disconnect();closing=true;updates.stop();auth.dispose();clearTimeout(debounce);clearInterval(tick);clearInterval(refresh);clearInterval(heartbeat);session.close();store.close();process.exit(0);
   }
   const heartbeat=setInterval(()=>session.touch(),HEARTBEAT_MS);
   const tick=setInterval(()=>{if(engine)void engine.tick().catch(()=>{notice='Ошибка обработки очереди. Переподключитесь.';disconnect();changed();});},1000);
@@ -168,7 +170,7 @@ async function main() {
     });
   });
   input.on('close',shutdown);process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
-  emit({event:'state',data:state()});connect();auth.resume();
+  emit({event:'state',data:state()});connect();auth.resume();if(!demo)updates.start();
 }
 process.on('uncaughtException',()=>{process.stdout.write(JSON.stringify({event:'fatal',error:'The local worker stopped. Your data is preserved.'})+'\n');process.exit(1);});
 process.on('unhandledRejection',()=>{process.stdout.write(JSON.stringify({event:'fatal',error:'The local worker stopped. Your data is preserved.'})+'\n');process.exit(1);});

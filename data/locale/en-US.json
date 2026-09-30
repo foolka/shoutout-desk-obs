@@ -1,4 +1,9 @@
 {
+"raidShoutouts":"Automatic raid shoutouts",
+"raidHelp":"Waits 20 seconds after a raid, including streamers outside your list. An observed Twitch shoutout from another bot cancels the duplicate. Cooldowns and Twitch limits still apply.",
+"autoUpdates":"Notify about new versions",
+"updateBanner":"Update %1: open",
+"raid":"Raid",
   "connectionMode": "Connection",
   "directMode": "Twitch directly",
   "oneInstance": "Use only one active auto-shoutout instance per channel.",

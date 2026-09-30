@@ -17,7 +17,7 @@ function authFixture(t,overrides={}){
 test('installed SDK exports public-client auth, API and EventSub classes',async()=>{
   const sdk=await loadSdk();for(const key of ['startDeviceCodeFlow','exchangeDeviceCode','RefreshingAuthProvider','ApiClient','EventSubWsListener'])assert.equal(typeof sdk[key],'function');
   const provider=new sdk.RefreshingAuthProvider({clientId:CLIENT});assert.ok(provider);
-  for(const key of ['onChannelChatMessage','onChannelShoutoutCreate'])assert.equal(typeof sdk.EventSubWsListener.prototype[key],'function');
+  for(const key of ['onChannelChatMessage','onChannelShoutoutCreate','onChannelRaidTo'])assert.equal(typeof sdk.EventSubWsListener.prototype[key],'function');
 });
 test('OAuth accepts only public client ID shape and official activation URL',()=>{
   assert.equal(clientId(' '+CLIENT+' '),CLIENT);assert.throws(()=>clientId('secret?=token'));
@@ -103,6 +103,7 @@ function directFixture(t,{role='streamer',channel='actor',moderated=['channel'],
     onRevoke(cb){this.revoke=cb;} onUserSocketDisconnect(cb){this.disconnect=cb;}
     onChannelChatMessage(broadcaster,actor,cb){this.chat=cb;this.chatArgs=[broadcaster,actor];const sub={chat:true};subs.push(sub);return sub;}
     onChannelShoutoutCreate(broadcaster,actor,cb){this.shout=cb;this.shoutArgs=[broadcaster,actor];const sub={shout:true};subs.push(sub);return sub;}
+    onChannelRaidTo(broadcaster,cb){this.raid=cb;this.raidArgs=[broadcaster];const sub={raid:true};subs.push(sub);return sub;}
     start(){}stop(){this.stopped=true;}
   }
   class Api{
@@ -113,11 +114,11 @@ function directFixture(t,{role='streamer',channel='actor',moderated=['channel'],
   const provider={getAccessTokenForUser:async()=>token,refreshAccessTokenForUser:async()=>{refreshes++;return {accessToken:'fresh'};}};
   const auth={saved:saved(),getProvider:async()=>provider,validate:async()=>{},channels:async()=>moderated.map(id=>({id}))};
   const bridge=new DirectBridge({auth,target:{id:channel,login:'owner'},role,store:{observeShoutout:(...args)=>observed.push(args)},sdk:async()=>({ApiClient:Api,EventSubWsListener:Listener}),fetchImpl:async(url,options)=>{requests.push({url,options});if(response instanceof Error)throw response;return {status:Array.isArray(response)?response.shift():response};}});
-  t.after(()=>bridge.close());return {bridge,auth,requests,observed,subs,get listener(){return listener;},get refreshes(){return refreshes;},async ready(){await bridge.connect();listener.success(subs[0]);listener.success(subs[1]);}};
+  t.after(()=>bridge.close());return {bridge,auth,requests,observed,subs,get listener(){return listener;},get refreshes(){return refreshes;},async ready(){await bridge.connect();for(const sub of subs)listener.success(sub);}};
 }
-test('direct connection waits for both subscriptions and refuses another broadcaster',async t=>{
+test('direct connection waits for all three subscriptions and refuses another broadcaster',async t=>{
   const f=directFixture(t);let ready=0;f.bridge.on('ready',()=>ready++);await f.bridge.connect();
-  assert.deepEqual(f.listener.chatArgs,['actor','actor']);f.listener.success(f.subs[0]);assert.equal(ready,0);f.listener.success(f.subs[1]);assert.equal(ready,1);
+  assert.deepEqual(f.listener.chatArgs,['actor','actor']);assert.deepEqual(f.listener.raidArgs,['actor']);f.listener.success(f.subs[0]);assert.equal(ready,0);f.listener.success(f.subs[1]);assert.equal(ready,0);f.listener.success(f.subs[2]);assert.equal(ready,1);
   const bad=directFixture(t,{channel:'other'});await bad.bridge.connect();assert.equal(bad.listener,undefined);assert.equal(bad.requests.length,0);
 });
 test('direct subscription forwards chat and records observed shoutouts without posting',async t=>{
@@ -125,6 +126,15 @@ test('direct subscription forwards chat and records observed shoutouts without p
   f.listener.chat({chatterId:'u',chatterName:'viewer',broadcasterId:'actor',sourceBroadcasterId:'guest'});assert.equal(chat.user.login,'viewer');assert.equal(chat.sharedChatSource.id,'guest');
   f.listener.shout({broadcasterId:'actor',shoutedOutBroadcasterName:'viewer',startDate:new Date(1800000000000)});assert.deepEqual(f.observed,[['actor','viewer',1800000000000]]);assert.equal(f.requests.length,0);
 });
+test('incoming raids forward only for the current broadcaster and live connection',async t=>{
+  const f=directFixture(t);await f.ready();const events=[];f.bridge.on('event',(...args)=>events.push(args));
+  const event={raidedBroadcasterId:'actor',raidingBroadcasterId:'raider-id',raidingBroadcasterName:'raider'};
+  f.listener.raid({...event,raidedBroadcasterId:'other'});assert.equal(events.length,0);
+  f.listener.raid(event);assert.deepEqual(events,[['Raid',{raider:{id:'raider-id',login:'raider'},broadcaster:{id:'actor'}}]]);
+  f.listener.disconnect();f.listener.raid(event);assert.equal(events.length,1);
+  const old=f.listener;f.bridge.reset();old.raid(event);assert.equal(events.length,1);
+});
+
 test('direct POST uses the signed-in broadcaster for both required Twitch IDs',async t=>{
   const f=directFixture(t);await f.ready();const result=await f.bridge.call('send',{account:'actor',login:'viewer'});assert.equal(result.status,'sent');assert.equal(f.requests.length,1);
   const request=f.requests[0],url=new URL(request.url);assert.equal(url.searchParams.get('from_broadcaster_id'),'actor');assert.equal(url.searchParams.get('moderator_id'),'actor');assert.equal(request.options.method,'POST');
@@ -141,9 +151,9 @@ test('401 allows one refresh; 429 reports rate limit; 403 stops the connection',
   const rate=directFixture(t,{response:429});await rate.ready();assert.equal((await rate.bridge.call('send',{account:'actor',login:'viewer'})).status,'rate_limited');assert.equal(rate.requests.length,1);
   const forbidden=directFixture(t,{response:403});await forbidden.ready();assert.equal((await forbidden.bridge.call('send',{account:'actor',login:'viewer'})).status,'failed');assert.equal(forbidden.bridge.ready,false);assert.equal(forbidden.listener.stopped,true);
 });
-test('disconnect gates chat until both subscriptions reconnect, stale events are ignored',async t=>{
+test('disconnect gates chat until all subscriptions reconnect, stale events are ignored',async t=>{
   const f=directFixture(t);await f.ready();let chats=0;f.bridge.on('event',()=>chats++);f.listener.disconnect();f.listener.chat({});assert.equal(chats,0);
-  f.listener.success(f.subs[0]);assert.equal(f.bridge.ready,false);f.listener.success(f.subs[1]);assert.equal(f.bridge.ready,true);
+  f.listener.success(f.subs[0]);assert.equal(f.bridge.ready,false);f.listener.success(f.subs[1]);assert.equal(f.bridge.ready,false);f.listener.success(f.subs[2]);assert.equal(f.bridge.ready,true);
   const old=f.listener;f.bridge.reset();old.chat({});assert.equal(chats,0);old.shout({broadcasterId:'actor'});assert.equal(f.observed.length,0);
 });
 test('direct send rechecks external cooldown after asynchronous token preparation',async t=>{
