@@ -40,7 +40,8 @@ class Store {
     }
     if(!resumeQueue)this.db.prepare("UPDATE attempts SET status='cancelled', detail='Перезапуск: ожидаем новое событие' WHERE status='queued'").run();
   }
-  close() { this.db.close(); }
+  checkpoint() { return this.db.prepare('PRAGMA wal_checkpoint(PASSIVE)').get(); }
+  close() { this.checkpoint();this.db.close(); }
   lastAccount() {
     const row=this.db.prepare("SELECT value FROM preferences WHERE key='lastAccount'").get();
     return row ? JSON.parse(row.value) : {id:'',channel:''};
@@ -208,5 +209,15 @@ class Store {
   }
   unresolved(account) { return this.db.prepare("SELECT * FROM attempts WHERE account=? AND status='sending'").all(account); }
   history(account='') { return this.db.prepare('SELECT * FROM attempts WHERE account=? ORDER BY created_at DESC LIMIT 1000').all(account); }
+  displayHistory(account='') {
+    const attempts=this.history(account);
+    const observed=this.db.prepare(`SELECT o.* FROM observed_shoutouts o WHERE o.account=? AND NOT EXISTS (
+      SELECT 1 FROM attempts a WHERE a.account=o.account AND a.login=o.login AND a.status='sent'
+      AND o.stamp BETWEEN COALESCE(a.started_at,a.finished_at)-2000 AND a.finished_at+2000
+    ) ORDER BY o.stamp DESC LIMIT 1000`).all(account);
+    return [...attempts,...observed.map(row=>({id:'observed:'+row.account+':'+row.login+':'+row.stamp,
+      account:row.account,login:row.login,created_at:row.stamp,finished_at:row.stamp,status:'twitchConfirmed',detail:''}))]
+      .sort((a,b)=>b.created_at-a.created_at||a.id.localeCompare(b.id)).slice(0,1000);
+  }
 }
 module.exports={Store,normalizeLogin};

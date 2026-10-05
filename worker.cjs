@@ -64,7 +64,7 @@ async function main() {
   }
   function state(){
     const account=store.lastAccount();
-    const history=store.history(account.id);
+    const history=store.displayHistory(account.id);
     const people=store.people(account.id);
     return {version:VERSION,account,auth:auth.view(),prefs:store.prefs(),people,history,notice,update:updates.view(),
       connected:!!engine?.ready,live:!!engine?.live,demo,language:store.meta('language','ru-RU'),
@@ -169,7 +169,7 @@ async function main() {
   function shutdown(){
     if(closing)return;disconnect();closing=true;updates.stop();auth.dispose();clearTimeout(debounce);clearInterval(tick);clearInterval(refresh);clearInterval(heartbeat);session.close();store.close();process.exit(0);
   }
-  const heartbeat=setInterval(()=>session.touch(),HEARTBEAT_MS);
+  const heartbeat=setInterval(()=>{session.touch();store.checkpoint();},HEARTBEAT_MS);
   const tick=setInterval(()=>{if(engine)void engine.tick().catch(()=>{notice='Ошибка обработки очереди. Переподключитесь.';disconnect();changed();});},1000);
   const refresh=setInterval(async()=>{
     if(refreshing||!engine?.ready)return;refreshing=true;const active=engine;

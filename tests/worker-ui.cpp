@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QTemporaryDir>
 #include <QThread>
+#include <QTabWidget>
 #include <QTimer>
 #include <cstdio>
 
@@ -23,6 +24,9 @@ public:
     static void run(const QString &data,const QString &output){
         QTemporaryDir profile;ShoutoutDock dock(data,profile.path(),true);dock.show();
         require(wait([&]{return dock.workerReady;}),"Worker did not initialize");
+        bool confirmed=false;
+        for(auto entry:dock.state.value("history").toArray())if(entry.toObject().value("status")=="twitchConfirmed")confirmed=true;
+        require(confirmed,"Stored Twitch confirmation missing from worker history");
         bool replied=false;
         dock.command("add",{{"login","recovery_guest"}},[&](QJsonValue){replied=true;});
         require(wait([&]{return replied;}),"Add failed");replied=false;
@@ -49,6 +53,12 @@ public:
                 require(dock.queueLabel->isVisible(),"Queue status hidden");
                 require(dock.queueLabel->geometry().right()<dock.width(),"Queue text overflows panel");
                 require(dock.grab().save(output+"/queue-"+language+"-"+QString::number(width)+".png"),"Screenshot failed");
+                dock.tabs->setCurrentIndex(1);QApplication::processEvents();
+                bool visibleConfirmation=false;
+                for(auto label:dock.historyBox->findChildren<QLabel*>())if(label->text().contains(dock.t("twitchConfirmed")))visibleConfirmation=true;
+                require(visibleConfirmation,"Localized Twitch confirmation missing from history UI");
+                require(dock.grab().save(output+"/history-"+language+"-"+QString::number(width)+".png"),"History screenshot failed");
+                dock.tabs->setCurrentIndex(0);
             }
         }
         QTemporaryDir missingProfile;ShoutoutDock missing(data+"/absent",missingProfile.path(),true);missing.show();

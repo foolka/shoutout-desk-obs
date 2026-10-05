@@ -1,4 +1,5 @@
 {
+"twitchConfirmed":"Confirmed by Twitch",
 "workerUnavailable":"Local worker stopped",
 "workerMissing":"Missing plugin file: %1. Close OBS and reinstall the plugin. Do not delete your data folder.",
 "workerInstall":"Plugin files are missing or damaged. Close OBS and reinstall the plugin. Do not disable Windows protection.",

@@ -78,7 +78,7 @@ Run **one active instance per channel**: either this app or the OBS plugin. Sepa
 | Reconnect | Re-establish the selected connection. Does not replay old chat or reset cooldowns. |
 | Add / X | Add a nickname or Twitch profile URL; X removes it from the active list, preserving history/cooldown. Duplicates are merged. |
 | Search / sort / date | Filter visible people by nickname/date added; sort newest, oldest or name. Does not change who is enabled. |
-| History / Add | Shows outcomes and errors. Add restores a person missing from the list without issuing a shoutout. |
+| History / Add | Shows outcomes and errors. "Confirmed by Twitch" is a stored Twitch event, including events from other tools; it does not necessarily mean this plugin sent it. Previously stored events are also visible. Add restores a person missing from the list without issuing a shoutout. |
 | Import | Merge a JSON export or an old shoutouts.sqlite from the same channel. Sign in/connect first. Back up before merging; pause automation. Pending requests are not replayed. Close the source program before copying SQLite. |
 | Export | Write a new JSON file with this channel's people, history, cooldown data. No tokens, passwords or bot connection secrets. |
 | Data folder | Open the active profile, including automatic backups. Do not publish its contents. |

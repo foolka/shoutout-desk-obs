@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3 - 2026-10-06
+
+- Include previously stored Twitch-confirmed events in visible history, including shoutouts made by other tools. Do not label them as sent by this plugin.
+- Hide duplicate Twitch confirmation rows for a locally confirmed successful attempt. Keep exports and the underlying database schema unchanged.
+- Checkpoint committed SQLite WAL data into the main database on each heartbeat and clean shutdown, without blocking active readers.
+- Includes the queue and worker recovery improvements from 0.3.2.
+
 ## 0.3.2 - 2026-10-06
 
 - Preserve pending shoutouts across temporary disconnects within the same broadcast; discard them when the broadcast or account changes.
