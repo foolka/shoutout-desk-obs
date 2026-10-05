@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.2 - 2026-10-06
+
+- Preserve pending shoutouts across temporary disconnects within the same broadcast; discard them when the broadcast or account changes.
+- Retry temporary failures before a shoutout request is sent, without consuming a personal cooldown. Never blindly resend an uncertain request.
+- Bound Twitch preflight and reconnect waits; stop cancelled retries from delaying unrelated people.
+- Show the next person and minimum waiting time in the dock, with outcome reasons visible in history.
+- Recover a crashed or unresponsive local worker with bounded retries, preserving the current pause state and queue.
+- Diagnose missing runtime files and profile access/database errors, with small local logs that contain no tokens or raw server responses.
+- Back up malformed version metadata instead of letting it prevent startup. Keep database schema 3 and existing people, history and authorization.
+
 ## 0.3.1 - 2026-09-30
 
 - Recover automatically from temporary network, rate-limit and Twitch server errors without requesting login.

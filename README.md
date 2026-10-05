@@ -14,6 +14,7 @@ Screenshots use fictional accounts. No personal profiles are included.
 
 ## Contents
 
+- [Queue and worker recovery](#recovery)
 - [Import a database from the first versions](#legacy-import)
 - [Download and install](#install)
 - [Setup](#setup)
@@ -22,6 +23,15 @@ Screenshots use fictional accounts. No personal profiles are included.
 - [Data and privacy](#privacy)
 - [Screenshots](#screenshots)
 - [Build from source](#build)
+
+<a id="recovery"></a>
+## Queue and worker recovery
+
+The dock shows the next person and the earliest sending time. Chat messages wait at least 10 seconds, raids at least 20 seconds, and channel shoutouts are spaced at least 125 seconds apart. Personal cooldowns and Twitch limits can increase the wait. History shows why an entry was skipped or failed.
+
+A temporary disconnect preserves pending people in the same broadcast. A new broadcast, account change, pause or manual reconnect clears pending work; old chat is not replayed. Temporary failures before sending are retried. If a request may already have reached Twitch, it stays unconfirmed rather than risking a duplicate.
+
+If the local worker stops or becomes unresponsive, the dock tries to restart it up to three times, retaining the session's pause state. If it still fails, close OBS and reinstall the complete latest EXE, or reinstall the complete ZIP for portable OBS. Do not delete the data folder or disable antivirus protection. The header's Reconnect button retries after repair. **Settings > Data folder** contains `worker-process.log` and, when available, `worker-diagnostic.log`; these logs have no tokens or passwords. Share only these logs when requesting help, not the database or authorization files.
 
 <a id="install"></a>
 ## Download and install

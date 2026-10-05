@@ -1,5 +1,26 @@
 const fs=require('node:fs');
 const path=require('node:path');
+let phase='loading',fatalReported=false;
+function fatal(error){
+  if(fatalReported)return process.exit(1);fatalReported=true;
+  const code=error?.code==='MODULE_NOT_FOUND'?'FILES_MISSING':
+    ['EACCES','EPERM','EROFS'].includes(error?.code)?'PROFILE_ACCESS':
+    /locked|busy/i.test(error?.message||'')?'PROFILE_LOCKED':
+    error?.code==='ERR_SQLITE_ERROR'?'PROFILE_DATABASE':error instanceof SyntaxError?'PROFILE_INVALID':'WORKER_CRASH';
+  const diagnostic={time:new Date().toISOString(),phase,code};
+  try{
+    const dir=process.argv[2];
+    if(path.isAbsolute(dir||'')){
+      const file=path.join(dir,'worker-diagnostic.log');
+      if(fs.existsSync(file)&&fs.statSync(file).size>131072)fs.renameSync(file,file+'.previous');
+      fs.appendFileSync(file,JSON.stringify(diagnostic)+'\n');
+    }
+  }catch{}
+  try{process.stdout.write(JSON.stringify({event:'fatal',code,phase})+'\n',()=>process.exit(1));}
+  catch{process.exit(1);}
+  setTimeout(()=>process.exit(1),100).unref();
+}
+process.on('uncaughtException',fatal);process.on('unhandledRejection',fatal);
 const readline=require('node:readline');
 const {spawn}=require('node:child_process');
 const {Store}=require('./core/store.cjs');
@@ -17,11 +38,11 @@ const VERSION=require('./package.json').version;
 async function main() {
   const args=process.argv.slice(2), dir=path.resolve(args[0]||''), helper=path.resolve(args[1]||'');
   if(!path.isAbsolute(args[0]||'')||!path.isAbsolute(args[1]||''))throw Error('Absolute profile and helper paths are required.');
-  const demo=args.includes('--offline-demo');
-  await prepareProfile(dir,VERSION);
-  const store=new Store(path.join(dir,'shoutouts.sqlite'));
+  const demo=args.includes('--offline-demo'),recover=args.includes('--recover-worker');
+  phase='backup';await prepareProfile(dir,VERSION);phase='database';
+  const store=new Store(path.join(dir,'shoutouts.sqlite'),Date.now,{resumeQueue:recover});
   // The checkbox pauses only this OBS session; startup never resets cooldowns.
-  store.setPrefs({enabled:true});
+  if(!recover)store.setPrefs({enabled:true});
   const secrets=vault(path.join(dir,'twitch-auth.dpapi'),helper);
   const pendingSecrets=vault(path.join(dir,'twitch-login.dpapi'),helper);
   const botSecrets=vault(path.join(dir,'connection.dpapi'),helper);
@@ -48,16 +69,16 @@ async function main() {
     return {version:VERSION,account,auth:auth.view(),prefs:store.prefs(),people,history,notice,update:updates.view(),
       connected:!!engine?.ready,live:!!engine?.live,demo,language:store.meta('language','ru-RU'),
       botPath:botConnection?.exe||'',botConfigured:!!botConnection,
-      queue:history.filter(h=>['queued','sending'].includes(h.status)).length,
+      queue:store.queueState(account.id).count,queueState:store.queueState(account.id),
       globalNextAt:store.globalNext(account.id),now:Date.now(),
       clientConfigured:!!(store.meta('clientId','')||require('./data/twitch-client.json').clientId)};
   }
   let debounce;
   function changed(){clearTimeout(debounce);debounce=setTimeout(()=>emit({event:'state',data:state()}),80);}
   const updates=new UpdateMonitor(store,VERSION,changed);
-  function disconnect(){generation++;engine?.stop();bridge?.close();engine=null;bridge=null;store.cancelQueue('Подключение остановлено');}
-  function connect(){
-    disconnect();const bot=store.prefs().provider==='bot';
+  function disconnect(preserveQueue=false){generation++;engine?.stop();bridge?.close();engine=null;bridge=null;if(!preserveQueue)store.cancelQueue('Подключение остановлено');}
+  function connect(preserveQueue=false){
+    disconnect(preserveQueue);const bot=store.prefs().provider==='bot';
     if(demo|| (bot?!botConnection:!auth.saved))return changed();
     const epoch=generation,user=bot?store.meta('botAccount',null):auth.saved.user;
     if(user)store.rememberAccount(user.id,user.login||user.channel);
@@ -159,6 +180,7 @@ async function main() {
   let chain=Promise.resolve();
   input.on('line',line=>{
     if(line.length>1024*1024)return shutdown();
+    try{const request=JSON.parse(line);if(Number.isSafeInteger(request.id)&&request.method==='ping'){emit({id:request.id,result:{ok:true}});return;}}catch{}
     chain=chain.then(async()=>{
       let request;
       try{
@@ -170,8 +192,6 @@ async function main() {
     });
   });
   input.on('close',shutdown);process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
-  emit({event:'state',data:state()});connect();auth.resume();if(!demo)updates.start();
+  phase='running';emit({event:'state',data:state()});connect(recover);auth.resume();if(!demo)updates.start();
 }
-process.on('uncaughtException',()=>{process.stdout.write(JSON.stringify({event:'fatal',error:'The local worker stopped. Your data is preserved.'})+'\n');process.exit(1);});
-process.on('unhandledRejection',()=>{process.stdout.write(JSON.stringify({event:'fatal',error:'The local worker stopped. Your data is preserved.'})+'\n');process.exit(1);});
-main().catch(()=>{process.stdout.write(JSON.stringify({event:'fatal',error:'Cannot open local data or create the required backup. No Twitch actions were started.'})+'\n');process.exit(1);});
+main().catch(fatal);

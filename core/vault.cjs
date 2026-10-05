@@ -46,7 +46,10 @@ async function prepareProfile(dir, version) {
   fs.mkdirSync(dir, {recursive:true});
   const marker = path.join(dir, 'profile-version.json');
   let previous;
-  if (fs.existsSync(marker)) previous = JSON.parse(fs.readFileSync(marker, 'utf8')).version;
+  if (fs.existsSync(marker)) {
+    try{previous=JSON.parse(fs.readFileSync(marker,'utf8')).version;}
+    catch(error){if(!(error instanceof SyntaxError))throw error;}
+  }
   if (previous !== version && fs.existsSync(path.join(dir, 'shoutouts.sqlite'))) await backupProfile(dir, `before-${version}`);
   // Called before opening/migrating the writable database; a failed backup aborts startup.
   atomicWrite(marker, JSON.stringify({version}));

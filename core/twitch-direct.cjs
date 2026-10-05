@@ -1,8 +1,13 @@
 const {EventEmitter}=require('node:events');
 const {loadSdk,safeError,publicError}=require('./twitch-auth.cjs');
+async function deadline(task,ms){
+  let timer;
+  try{return await Promise.race([task,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Preparation timed out')),ms);})]);}
+  finally{clearTimeout(timer);}
+}
 class DirectBridge extends EventEmitter {
-  constructor({auth,target,store,sdk=loadSdk,fetchImpl=globalThis.fetch}){
-    super();Object.assign(this,{auth,target,store,sdk,fetchImpl});this.closed=false;this.active=new Set();this.epoch=0;
+  constructor({auth,target,store,sdk=loadSdk,fetchImpl=globalThis.fetch,prepareTimeoutMs=15000}){
+    super();Object.assign(this,{auth,target,store,sdk,fetchImpl,prepareTimeoutMs});this.closed=false;this.active=new Set();this.epoch=0;
     this.authRetry=message=>this.reset(message);auth.on?.('retry',this.authRetry);
   }
   async connect(){
@@ -26,7 +31,10 @@ class DirectBridge extends EventEmitter {
         if(['authorization_revoked','user_removed'].includes(status))this.auth.invalidate('Twitch отозвал доступ. Войдите через Twitch снова.');
         this.fail('Подписка Twitch остановлена: '+status,epoch,false);
       });
-      listener.onUserSocketDisconnect(()=>{if(!this.closed&&epoch===this.epoch){this.ready=false;this.active.clear();this.emit('offline','Переподключение к Twitch');}});
+      listener.onUserSocketDisconnect(()=>{if(!this.closed&&epoch===this.epoch){
+        this.ready=false;this.active.clear();this.emit('offline','Переподключение к Twitch');
+        clearTimeout(this.connectTimer);this.connectTimer=setTimeout(()=>this.fail('Повторяем подключение к Twitch',epoch),30000);this.connectTimer.unref?.();
+      }});
       chat=listener.onChannelChatMessage(this.target.id,this.actor,event=>{
         if(!this.ready||this.closed||epoch!==this.epoch)return;
         this.emit('event','ChatMessage',{user:{id:event.chatterId,login:event.chatterName},broadcaster:{id:event.broadcasterId},sharedChatSource:{id:event.sourceBroadcasterId||''}});
@@ -52,18 +60,24 @@ class DirectBridge extends EventEmitter {
     if(op==='probe')return {status:'unknown'};
     if(!this.api)throw publicError('Twitch ещё не подключён.');
     if(op==='status'){
-      await this.auth.validate();const stream=await this.api.asUser(this.actor,api=>api.streams.getStreamByUserId(this.target.id));
-      return {status:'ok',account:this.target.id,channel:this.target.login,live:!!stream};
+      const stream=await deadline((async()=>{await this.auth.validate();return this.api.asUser(this.actor,api=>api.streams.getStreamByUserId(this.target.id));})(),this.prepareTimeoutMs);
+      return {status:'ok',account:this.target.id,channel:this.target.login,live:!!stream,streamId:stream?.id||''};
     }
     if(op!=='send'||args.account!==this.target.id)return {status:'failed',detail:'Выбран другой канал'};
-    let target,token;
+    let target,token;const epoch=this.epoch;
+    const deferred=()=>({status:'deferred',detail:'Twitch недоступен до отправки. Отметка сохранена в очереди.'});
     try{
-      const state=await this.call('status');if(!state.live)return {status:'offline'};
-      target=await this.api.asUser(this.actor,api=>api.users.getUserByName(args.login));
+      const prepared=await deadline((async()=>{
+        const state=await this.call('status');if(!state.live)return {offline:true};
+        const target=await this.api.asUser(this.actor,api=>api.users.getUserByName(args.login));
+        const token=await this.provider.getAccessTokenForUser(this.actor,['moderator:manage:shoutouts']);
+        return {target,token};
+      })(),this.prepareTimeoutMs);
+      if(prepared.offline)return {status:'offline'};
+      ({target,token}=prepared);
       if(!target||target.id===this.target.id)return {status:'failed',detail:'Канал не найден или выбран собственный канал'};
-      token=await this.provider.getAccessTokenForUser(this.actor,['moderator:manage:shoutouts']);
-    }catch(error){return {status:'failed',detail:error.publicMessage||safeError(error)};}
-    if(this.closed||!this.ready||this.auth.invalid)return {status:'failed',detail:'Соединение изменилось до отправки'};
+    }catch(error){return this.auth.invalid?{status:'failed',detail:error.publicMessage||safeError(error)}:deferred();}
+    if(this.closed||!this.ready||this.auth.invalid||epoch!==this.epoch)return this.auth.invalid?{status:'failed',detail:this.auth.message}:deferred();
     const params=new URLSearchParams({from_broadcaster_id:this.target.id,to_broadcaster_id:target.id,moderator_id:this.actor});
     // No SDK auto-retries for this side effect: a lost response must remain uncertain.
     const post=access=>this.fetchImpl('https://api.twitch.tv/helix/chat/shoutouts?'+params,{method:'POST',headers:{'Client-Id':this.auth.saved.clientId,Authorization:'Bearer '+access},signal:AbortSignal.timeout(10000),redirect:'error'});
@@ -71,8 +85,8 @@ class DirectBridge extends EventEmitter {
       if(args.canSend&&!args.canSend())return {status:'cancelled',detail:'Шотаут уже сделан в канале или очередь отменена'};
       let response=await post(token.accessToken);
       if(response.status===401){
-        let refreshed;try{refreshed=await this.provider.refreshAccessTokenForUser(this.actor);}catch(error){return {status:'failed',detail:this.auth.message||safeError(error)};}
-        if(this.closed||!this.ready||this.auth.invalid)return {status:'failed',detail:'Подключение закрыто'};
+        let refreshed;try{refreshed=await deadline(this.provider.refreshAccessTokenForUser(this.actor),this.prepareTimeoutMs);}catch(error){return this.auth.invalid?{status:'failed',detail:this.auth.message||safeError(error)}:deferred();}
+        if(this.closed||!this.ready||this.auth.invalid||epoch!==this.epoch)return this.auth.invalid?{status:'failed',detail:this.auth.message}:deferred();
         if(args.canSend&&!args.canSend())return {status:'cancelled',detail:'Шотаут уже сделан в канале или очередь отменена'};
         response=await post(refreshed.accessToken);
       }

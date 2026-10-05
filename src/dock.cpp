@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -74,6 +75,12 @@ ShoutoutDock::ShoutoutDock(QString data, QString profile, bool demo, QWidget *pa
     QTimer::singleShot(0,this,[this]{startWorker();});
     auto timer=new QTimer(this);timer->setInterval(15000);
     connect(timer,&QTimer::timeout,this,[this]{if(!state.isEmpty())render();});timer->start();
+    workerRetryTimer=new QTimer(this);workerRetryTimer->setSingleShot(true);
+    connect(workerRetryTimer,&QTimer::timeout,this,[this]{startWorker();});
+    auto health=new QTimer(this);health->setInterval(5000);
+    connect(health,&QTimer::timeout,this,[this]{checkWorker();});health->start();
+    auto countdown=new QTimer(this);countdown->setInterval(1000);
+    connect(countdown,&QTimer::timeout,this,[this]{renderQueue();});countdown->start();
 }
 ShoutoutDock::~ShoutoutDock() { stop(); }
 void ShoutoutDock::resizeEvent(QResizeEvent *event){
@@ -85,6 +92,7 @@ void ShoutoutDock::resizeEvent(QResizeEvent *event){
 }
 void ShoutoutDock::stop() {
     if(stopped)return;stopped=true;
+    if(workerRetryTimer)workerRetryTimer->stop();
     if(authNoticeTimer)authNoticeTimer->stop();
     if(authWarning)delete authWarning.data();
     if(worker && worker->state()!=QProcess::NotRunning){
@@ -141,6 +149,7 @@ void ShoutoutDock::build(){
     auto resetDate=tool("x",t("clearDate"));resetDate->setFixedWidth(26);filters->addWidget(resetDate);p->addLayout(filters);
     connect(resetDate,&QToolButton::clicked,this,[this]{since->setDate(since->minimumDate());});
     summary=label({},"muted");p->addWidget(summary);
+    queueLabel=label({},"muted");queueLabel->hide();p->addWidget(queueLabel);
     auto peopleOuter=new QWidget;auto outer=column(peopleOuter);peopleBox=new QWidget;peopleLayout=new FlowLayout(peopleBox);outer->addWidget(peopleBox);outer->addStretch();p->addWidget(scrollArea(peopleOuter),1);
     tabs->addTab(people,icon("users"),t("people"));
     connect(search,&QLineEdit::textChanged,this,[this]{peopleSignature.clear();renderPeople();});
@@ -221,31 +230,75 @@ void ShoutoutDock::build(){
     codeLabel->hide();openAuthButton->hide();logoutButton->hide();loginButton->hide();clientEdit->hide();
 }
 void ShoutoutDock::startWorker(){
-    QDir().mkpath(profileRoot);lock=std::make_unique<QLockFile>(profileRoot+"/worker.lock");lock->setStaleLockTime(0);
-    if(!lock->tryLock(0)){showError(t("alreadyRunning"));return;}
+    if(stopped||(worker&&worker->state()!=QProcess::NotRunning))return;
+    workerRetryTimer->stop();workerReady=false;callbacks.clear();buffer.clear();workerStderr.clear();workerProblem.clear();
+    if(!QDir().mkpath(profileRoot)){workerFailed(t("workerAccess"),"PROFILE_ACCESS",0,false);return;}
+    if(!lock){
+        lock=std::make_unique<QLockFile>(profileRoot+"/worker.lock");lock->setStaleLockTime(0);
+        if(!lock->tryLock(0)){lock.reset();showError(t("alreadyRunning"));return;}
+    }
+    for(const auto &file:QStringList{"runtime/node.exe","worker.cjs","shoutout-secure.exe","core/store.cjs","core/engine.cjs","data/twitch-client.json"}){
+        if(!QFileInfo::exists(dataRoot+"/"+file)){workerFailed(t("workerMissing").arg(file),"FILES_MISSING",0,false);return;}
+    }
+    if(worker){worker->disconnect(this);worker->deleteLater();}
     worker=new QProcess(this);worker->setProgram(dataRoot+"/runtime/node.exe");
     QStringList args{"--disable-warning=ExperimentalWarning",dataRoot+"/worker.cjs",profileRoot,dataRoot+"/shoutout-secure.exe"};if(preview)args<<"--offline-demo";
+    if(workerInitialized)args<<"--recover-worker";
     worker->setArguments(args);worker->setWorkingDirectory(dataRoot);
     auto env=QProcessEnvironment::systemEnvironment();env.remove("NODE_OPTIONS");env.remove("NODE_PATH");worker->setProcessEnvironment(env);
     connect(worker,&QProcess::readyReadStandardOutput,this,[this]{readWorker();});
-    connect(worker,&QProcess::readyReadStandardError,this,[this]{worker->readAllStandardError();});
-    connect(worker,&QProcess::errorOccurred,this,[this](QProcess::ProcessError){if(!stopped)showError(t("workerFailed"));});
-    connect(worker,QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),this,[this](int,QProcess::ExitStatus){if(!stopped){enabled->setEnabled(false);showError(t("workerFailed"));}});
+    connect(worker,&QProcess::readyReadStandardError,this,[this]{workerStderr=(workerStderr+worker->readAllStandardError()).right(8192);});
+    connect(worker,&QProcess::errorOccurred,this,[this](QProcess::ProcessError error){
+        if(error==QProcess::FailedToStart)workerFailed(t("workerLaunch"),"LAUNCH_FAILED",int(error));
+    });
+    connect(worker,QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),this,[this](int code,QProcess::ExitStatus){
+        if(stopped)return;
+        readWorker();
+        const bool missing=workerStderr.contains("Cannot find module")||workerStderr.contains("ERR_MODULE_NOT_FOUND");
+        workerFailed(workerProblem.isEmpty()?(missing?t("workerInstall"):t("workerFailed")):workerProblem,"PROCESS_EXIT",code,!missing);
+    });
+    workerStartedAt=workerLastReply=QDateTime::currentMSecsSinceEpoch();connection->setText(t("starting"));showError(t("starting"));
     worker->start();
 }
+void ShoutoutDock::workerFailed(const QString &message,const QString &reason,int code,bool retry){
+    if(stopped)return;
+    workerReady=false;callbacks.clear();enabled->setEnabled(false);workerProblem=message;connection->setText(t("workerUnavailable"));
+    QFile log(profileRoot+"/worker-process.log");
+    if(log.size()>131072){QFile::remove(log.fileName()+".previous");QFile::rename(log.fileName(),log.fileName()+".previous");}
+    if(log.open(QIODevice::WriteOnly|QIODevice::Append))log.write(QJsonDocument(QJsonObject{{"time",QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},{"reason",reason},{"code",code}}).toJson(QJsonDocument::Compact)+'\n');
+    if(retry&&workerRestarts<3){
+        if(!workerRetryTimer->isActive()){const int delays[]={1000,3000,10000};workerRetryTimer->start(delays[workerRestarts++]);}
+        showError(message+"\n"+t("workerRetrying").arg(workerRestarts));
+    }else showError(message+"\n"+t("workerRetryHelp"));
+}
+void ShoutoutDock::checkWorker(){
+    if(stopped||!worker||worker->state()!=QProcess::Running)return;
+    const auto now=QDateTime::currentMSecsSinceEpoch();
+    if(now-workerLastReply>(workerReady?45000:90000)){workerProblem=t("workerHung");worker->kill();return;}
+    if(workerReady&&now-workerStartedAt>=60000)workerRestarts=0;
+    if(workerReady)command("ping");
+}
 void ShoutoutDock::command(const QString &method,QJsonObject params,std::function<void(QJsonValue)> callback){
-    if(stopped||!worker||worker->state()!=QProcess::Running){showError(t("workerFailed"));return;}
+    if(stopped)return;
+    if(!worker||worker->state()==QProcess::NotRunning){
+        if(method=="reconnect"){workerRestarts=0;startWorker();}else showError(workerProblem.isEmpty()?t("starting"):workerProblem+"\n"+t("workerRetryHelp"));
+        return;
+    }
+    if(!workerReady){showError(t("starting"));return;}
     const auto id=++requestId;if(callback)callbacks.insert(id,std::move(callback));
     QJsonObject request{{"id",id},{"method",method},{"params",params}};
     worker->write(QJsonDocument(request).toJson(QJsonDocument::Compact)+'\n');
 }
 void ShoutoutDock::readWorker(){
     buffer+=worker->readAllStandardOutput();
-    if(buffer.size()>8*1024*1024){showError(t("workerFailed"));worker->kill();return;}
+    if(buffer.size()>8*1024*1024){workerProblem=t("workerFailed");buffer.clear();worker->kill();return;}
     int pos;
     while((pos=buffer.indexOf('\n'))>=0){
         auto line=buffer.left(pos);buffer.remove(0,pos+1);auto message=QJsonDocument::fromJson(line).object();
+        if(message.isEmpty())continue;
+        workerLastReply=QDateTime::currentMSecsSinceEpoch();
         if(message.value("event")=="state"){
+            workerReady=true;workerInitialized=true;workerProblem.clear();workerRetryTimer->stop();
             state=message.value("data").toObject();
             if(state.value("notice").toString().isEmpty())notice->hide();
             auto next=state.value("language").toString("ru-RU");
@@ -254,7 +307,11 @@ void ShoutoutDock::readWorker(){
                 clearLayout(layout());delete layout();build();tabs->setCurrentIndex(index);peopleSignature.clear();historySignature.clear();
             }
             render();
-        }else if(message.value("event")=="fatal")showError(message.value("error").toString());
+        }else if(message.value("event")=="fatal"){
+            const auto code=message.value("code").toString();
+            workerProblem=t(code=="FILES_MISSING"?"workerInstall":code=="PROFILE_ACCESS"?"workerAccess":code=="PROFILE_LOCKED"?"workerLocked":code=="PROFILE_DATABASE"||code=="PROFILE_INVALID"?"workerDatabase":"workerFailed");
+            showError(workerProblem);
+        }
         else{
             const auto id=message.value("id").toInteger();auto cb=callbacks.take(id);
             if(message.contains("error"))showError(message.value("error").toString());else if(cb)cb(message.value("result"));
@@ -338,7 +395,7 @@ void ShoutoutDock::render(){
     provider->setCurrentIndex(bot?1:0);directSettings->setVisible(!bot);botSettings->setVisible(bot);
     if(botPath->text().isEmpty())botPath->setText(state.value("botPath").toString());
     accountLabel->setText(account.value("channel").toString().isEmpty()?t("notConnected"):"@"+account.value("channel").toString());
-    enabled->setEnabled((bot?state.value("botConfigured").toBool():logged)||preview);enabled->setChecked(prefs.value("enabled").toBool());
+    enabled->setEnabled(workerReady&&((bot?state.value("botConfigured").toBool():logged)||preview));enabled->setChecked(prefs.value("enabled").toBool());
     resetAfterLongClose->setChecked(prefs.value("resetAfterLongClose").toBool());
     raidShoutouts->setChecked(prefs.value("raidShoutouts").toBool());
     autoUpdates->setChecked(prefs.value("autoUpdates").toBool(true));
@@ -347,15 +404,26 @@ void ShoutoutDock::render(){
     updateBanner->setText(t("updateBanner").arg(release.value("version").toString()));
     hours->setValue(prefs.value("cooldownHours").toInt(24));hoursLabel->setText(t("hours").arg(hours->value()));
     const bool connected=state.value("connected").toBool(),live=state.value("live").toBool();
-    connection->setText(!bot&&needsLogin?t("reauthRequired"):preview?t("demo"):connected?(live?t("live"):t("offline")):(bot?state.value("botConfigured").toBool():logged)?t("connecting"):t("notConnected"));
+    connection->setText(!workerReady?t("workerUnavailable"):!bot&&needsLogin?t("reauthRequired"):preview?t("demo"):connected?(live?t("live"):t("offline")):(bot?state.value("botConfigured").toBool():logged)?t("connecting"):t("notConnected"));
     const auto authStatus=auth.value("status").toString();
     authLabel->setText(needsLogin?t("reauthRequired"):authStatus=="restoring"?t("restoring"):authStatus=="retrying"?t("retryingAuth"):auth.value("message").toString().isEmpty()?(logged?"@"+auth.value("user").toObject().value("login").toString():t("notConnected")):auth.value("message").toString());
     versionLabel->setText("Shoutout Desk OBS "+state.value("version").toString());
     const auto pending=auth.value("pending").toObject();codeLabel->setText(pending.value("code").toString());codeLabel->setVisible(!pending.isEmpty());openAuthButton->setVisible(!pending.isEmpty());
     loginButton->setVisible(!logged&&pending.isEmpty());loginButton->setText(t(needsLogin?"signInAgain":"login"));logoutButton->setVisible(saved);clientEdit->setVisible(!logged&&!state.value("clientConfigured").toBool());
-    if(!state.value("notice").toString().isEmpty())showError(state.value("notice").toString());
+    if(workerReady&&!state.value("notice").toString().isEmpty())showError(state.value("notice").toString());
     summary->setText(t("summary").arg(state.value("people").toArray().size()).arg(state.value("queue").toInt()).arg(prefs.value("cooldownHours").toInt(24)));
-    painting=false;renderPeople();renderHistory();checkAuthNotice();
+    painting=false;renderPeople();renderHistory();renderQueue();checkAuthNotice();
+}
+void ShoutoutDock::renderQueue(){
+    if(!queueLabel)return;
+    const auto queue=state.value("queueState").toObject();
+    queueLabel->setVisible(queue.value("count").toInt()>0);
+    if(!workerReady||!state.value("connected").toBool()){queueLabel->setText(t("queueConnection"));return;}
+    if(!state.value("prefs").toObject().value("enabled").toBool()){queueLabel->setText(t("queuePaused"));return;}
+    const auto login=queue.value("login").toString();
+    if(queue.value("sending").toBool()){queueLabel->setText(t("queueSending").arg(login));return;}
+    const auto seconds=qMax<qint64>(0,(queue.value("nextAt").toInteger()-QDateTime::currentMSecsSinceEpoch()+999)/1000);
+    queueLabel->setText(seconds?t("queueNext").arg(login).arg(seconds/60).arg(seconds%60,2,10,QChar('0')):t("queueReady").arg(login));
 }
 void ShoutoutDock::clearLayout(QLayout *layout){
     if(!layout)return;
@@ -392,6 +460,7 @@ void ShoutoutDock::renderHistory(){
         details->addWidget(label(login+(row.value("trigger").toString()=="raid"?"  ·  "+t("raid"):""),"personName"));
         const auto date=QDateTime::fromMSecsSinceEpoch(row.value("created_at").toInteger()).toString("dd.MM.yyyy  HH:mm");
         const auto status=row.value("status").toString();auto description=label(date+"  ·  "+t(status.toUtf8().constData()),"muted");description->setToolTip(row.value("detail").toString());details->addWidget(description);l->addLayout(details,1);
+        if(!row.value("detail").toString().isEmpty())details->addWidget(label(row.value("detail").toString(),"muted"));
         if(!people.contains(login)){auto add=tool("user-plus",t("add"));l->addWidget(add);connect(add,&QToolButton::clicked,this,[this,login]{command("add",{{"login",login}});});}
         historyLayout->addWidget(item);
     }

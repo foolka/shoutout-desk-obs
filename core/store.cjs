@@ -14,7 +14,7 @@ function normalizeLogin(input) {
 }
 
 class Store {
-  constructor(file, now = Date.now) {
+  constructor(file, now = Date.now, {resumeQueue=false} = {}) {
     this.now = now;
     this.db = new DatabaseSync(file);
     if(this.db.prepare('PRAGMA user_version').get().user_version>3){this.db.close();throw Error('База создана более новой версией плагина. Обновите плагин или восстановите соответствующую резервную копию.');}
@@ -38,7 +38,7 @@ class Store {
         this.db.exec("ALTER TABLE attempts ADD COLUMN trigger TEXT NOT NULL DEFAULT 'chat'; ALTER TABLE attempts ADD COLUMN not_before INTEGER NOT NULL DEFAULT 0; PRAGMA user_version=3; COMMIT");
       }catch(error){this.db.exec('ROLLBACK');throw error;}
     }
-    this.db.prepare("UPDATE attempts SET status='cancelled', detail='Перезапуск: ожидаем новое событие' WHERE status='queued'").run();
+    if(!resumeQueue)this.db.prepare("UPDATE attempts SET status='cancelled', detail='Перезапуск: ожидаем новое событие' WHERE status='queued'").run();
   }
   close() { this.db.close(); }
   lastAccount() {
@@ -162,9 +162,20 @@ class Store {
   globalNext(account) {
     const stamp = this.db.prepare(`SELECT MAX(COALESCE(finished_at,started_at)) AS stamp FROM attempts
       WHERE account=? AND status IN ('sent','sending','uncertain')`).get(account).stamp;
-    const block = this.db.prepare("SELECT MAX(retry_at) AS stamp FROM attempts WHERE account=?").get(account).stamp;
+    const block = this.db.prepare("SELECT MAX(retry_at) AS stamp FROM attempts WHERE account=? AND status='queued'").get(account).stamp;
     const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=?').get(account).stamp;
     return Math.max(stamp == null ? 0 : stamp+125000, block || 0,observed==null?0:observed+125000);
+  }
+  queueState(account,settleMs=10000){
+    const rows=this.db.prepare("SELECT * FROM attempts WHERE account=? AND status IN ('queued','sending') ORDER BY created_at,rowid").all(account);
+    const sending=rows.find(row=>row.status==='sending');
+    if(sending)return {count:rows.length,login:sending.login,sending:true,nextAt:0};
+    const now=this.now(),global=this.globalNext(account);
+    const eligible=rows.filter(row=>row.created_at>=now-30*60000);
+    const time=row=>Math.max(global,row.not_before,row.retry_at,row.created_at+settleMs);
+    const ready=eligible.find(row=>time(row)<=now);
+    const first=ready||eligible.reduce((best,row)=>!best||time(row)<time(best)?row:best,null);
+    return {count:rows.length,login:first?.login||'',sending:false,nextAt:first?time(first):0};
   }
   take(account,settleMs=0) {
     if (this.globalNext(account)>this.now()) return null;
@@ -180,6 +191,11 @@ class Store {
   finish(id,status,detail='',stamp=this.now()) {
     if (!['sent','failed','uncertain','cancelled'].includes(status)) throw Error('Invalid result');
     this.db.prepare('UPDATE attempts SET status=?,detail=?,finished_at=? WHERE id=?').run(status,detail,stamp,id);
+  }
+  defer(id,detail='Нет ответа Twitch до отправки. Повторяем автоматически.') {
+    if(!this.canSend(id)){this.finish(id,'cancelled','Очередь отменена или отметка уже сделана');return;}
+    // No POST was attempted, so releasing the reservation cannot duplicate a shoutout.
+    this.db.prepare("UPDATE attempts SET status='queued',started_at=NULL,finished_at=NULL,retry_at=0,not_before=?,detail=?,tries=MAX(0,tries-1) WHERE id=?").run(this.now()+15000,detail,id);
   }
   retry(id,delay=125000,detail='Ожидание Twitch') {
     const row=this.db.prepare('SELECT * FROM attempts WHERE id=?').get(id);

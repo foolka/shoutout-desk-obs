@@ -168,3 +168,22 @@ test('direct send rechecks external cooldown before a 401 retry',async t=>{
   const result=await f.bridge.call('send',{account:'actor',login:'viewer',canSend:()=>allowed});
   assert.equal(result.status,'cancelled');assert.equal(f.requests.length,1);
 });
+test('failed or stalled GET preparation is deferred and never posts late',async t=>{
+  const f=directFixture(t);await f.ready();f.bridge.prepareTimeoutMs=10;
+  f.auth.validate=async()=>{throw Error('Network unavailable');};
+  assert.equal((await f.bridge.call('send',{account:'actor',login:'viewer'})).status,'deferred');
+  let resolve;f.auth.validate=()=>new Promise(r=>resolve=r);
+  assert.equal((await f.bridge.call('send',{account:'actor',login:'viewer'})).status,'deferred');
+  resolve();await new Promise(setImmediate);assert.equal(f.requests.length,0);
+});
+test('temporary token refresh failure after a definitive 401 is safe to defer',async t=>{
+  const f=directFixture(t,{response:401});await f.ready();
+  f.bridge.provider.refreshAccessTokenForUser=async()=>{throw Error('offline');};
+  assert.equal((await f.bridge.call('send',{account:'actor',login:'viewer'})).status,'deferred');assert.equal(f.requests.length,1);
+});
+test('socket outage arms a reconnect deadline, all subscriptions clear it',async t=>{
+  const f=directFixture(t);await f.ready();f.listener.disconnect();
+  assert.equal(f.bridge.connectTimer._destroyed,false);
+  for(const sub of f.subs)f.listener.success(sub);
+  assert.equal(f.bridge.ready,true);assert.equal(f.bridge.connectTimer._destroyed,true);
+});
