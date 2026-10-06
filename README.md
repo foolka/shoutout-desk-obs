@@ -20,6 +20,7 @@ Screenshots use fictional accounts. No personal profiles are included.
 - [Setup](#setup)
 - [Settings and controls](#settings)
 - [Updates and portable mode](#updates)
+- [Send diagnostic logs](#diagnostics)
 - [Data and privacy](#privacy)
 - [Screenshots](#screenshots)
 - [Build from source](#build)
@@ -108,6 +109,15 @@ Use **Check for updates**, close OBS and run the new installer. The normal profi
 **ZIP / manual install:** extract everything and run `Install.cmd` as administrator for normal OBS. It validates package hashes and keeps a backup of the previous plugin files.
 
 **Portable OBS:** use the same ZIP and `Install-Portable.cmd`, selecting portable OBS's `bin\64bit\obs64.exe`. Enable OBS portable mode first with an empty `portable_mode.txt` in its root. The plugin lives in `obs-plugins\64bit` and `data\obs-plugins`; its separate profile is `config\shoutout-desk-obs` inside portable OBS. Repeat the same installer to update while OBS is closed. Keep `config`; use Export/Import to migrate lists. Windows-protected login requires reauthorization on a different PC. Avoid installing both common and manual copies into the same OBS installation.
+
+<a id="diagnostics"></a>
+## Send diagnostic logs
+
+Open **Settings > Diagnostics**, choose **Last hour, 24 hours or 7 days**, then click **Send logs** and confirm. Send the report reference to the maintainer so they can find it.
+
+The report goes to `https://fermionaplay.win` and is visible only to the site owner, for **30 days**. It contains your configured Twitch channel name, app version, connection state, counts and queue outcomes. Event usernames are replaced with per-report identifiers. No chat text, OAuth tokens, passwords, raw exceptions or people database are uploaded. No automatic log uploads occur. Standard server access logs may contain your IP address.
+
+Detailed local logs start with this update, are size-limited and rotate over about 7 days; earlier events are included only when present in saved history. Reports are capped at 1,800 events / 512 KiB and indicate incomplete data. Failed sending leaves your data unchanged; retry later. In OBS, diagnostics use a separate helper and can still work when the main worker is unavailable, provided the bundled runtime is intact.
 
 <a id="privacy"></a>
 ## Data and privacy

@@ -95,6 +95,7 @@ void ShoutoutDock::stop() {
     if(workerRetryTimer)workerRetryTimer->stop();
     if(authNoticeTimer)authNoticeTimer->stop();
     if(authWarning)delete authWarning.data();
+    if(diagnosticProcess && diagnosticProcess->state()!=QProcess::NotRunning){diagnosticProcess->kill();diagnosticProcess->waitForFinished(1000);}
     if(worker && worker->state()!=QProcess::NotRunning){
         worker->write("{\"id\":999999999,\"method\":\"quit\"}\n");worker->closeWriteChannel();
         if(!worker->waitForFinished(1800)){worker->kill();worker->waitForFinished(1000);}
@@ -225,9 +226,73 @@ void ShoutoutDock::build(){
     autoUpdates=new QCheckBox(t("autoUpdates"));s->addWidget(autoUpdates);
     connect(autoUpdates,&QCheckBox::toggled,this,[this](bool checked){if(!painting)command("prefs",{{"autoUpdates",checked}});});
     connect(update,&QPushButton::clicked,this,[this,update]{update->setEnabled(false);QPointer<QPushButton> guard(update);command("update",{},[this,guard](QJsonValue v){if(guard)guard->setEnabled(true);auto r=v.toObject();if(r.value("available").toBool()){if(QMessageBox::question(this,t("update"),t("updateAvailable").arg(r.value("version").toString()))==QMessageBox::Yes)openUrl(r.value("url").toString());}else QMessageBox::information(this,t("update"),t("upToDate"));});QTimer::singleShot(15000,update,[update]{update->setEnabled(true);});});
+    s->addSpacing(8);s->addWidget(label(t("diagnostic_title"),"section"));
+    diagnosticPeriod=new QComboBox;diagnosticPeriod->setObjectName("diagnosticPeriod");diagnosticPeriod->setAccessibleName(t("diagnostic_period"));
+    diagnosticPeriod->addItem(t("diagnostic_hour"),1);diagnosticPeriod->addItem(t("diagnostic_day"),24);diagnosticPeriod->addItem(t("diagnostic_week"),168);diagnosticPeriod->setCurrentIndex(1);s->addWidget(diagnosticPeriod);
+    diagnosticSend=button(t("diagnostic_send"),"upload");diagnosticSend->setObjectName("diagnosticSend");diagnosticSend->setEnabled(!diagnosticBusy&&!preview);s->addWidget(diagnosticSend);
+    connect(diagnosticSend,&QPushButton::clicked,this,[this]{sendDiagnostics();});
+    s->addWidget(label(t("diagnostic_help"),"muted"));diagnosticResult=label({},"muted");diagnosticResult->setTextInteractionFlags(Qt::TextSelectableByMouse);s->addWidget(diagnosticResult);
     s->addStretch();tabs->addTab(scrollArea(settings),icon("settings-2"),t("settings"));
     connection=label(t("starting"),"connection");root->addWidget(connection);
     codeLabel->hide();openAuthButton->hide();logoutButton->hide();loginButton->hide();clientEdit->hide();
+}
+void ShoutoutDock::runDiagnostics(const QString &mode,const QJsonObject &input,std::function<void(QJsonObject)> callback){
+    if(stopped)return;
+    auto process=new QProcess(this);diagnosticProcess=process;
+    process->setProgram(dataRoot+"/runtime/node.exe");
+    process->setArguments({"--disable-warning=ExperimentalWarning",dataRoot+"/diagnostics-cli.cjs",mode,profileRoot});process->setWorkingDirectory(dataRoot);
+    auto env=QProcessEnvironment::systemEnvironment();env.remove("NODE_OPTIONS");env.remove("NODE_PATH");process->setProcessEnvironment(env);
+    auto output=std::make_shared<QByteArray>();auto done=std::make_shared<bool>(false);
+    auto finish=[this,process,output,done,callback]{
+        if(*done)return;*done=true;
+        *output+=process->readAllStandardOutput();
+        QJsonObject response;
+        if(output->size()<=524288)response=QJsonDocument::fromJson(*output).object();
+        if(response.isEmpty())response={{"ok",false},{"error","unavailable"}};
+        if(diagnosticProcess==process)diagnosticProcess=nullptr;
+        process->deleteLater();if(!stopped)callback(response);
+    };
+    connect(process,&QProcess::readyReadStandardOutput,this,[process,output]{*output+=process->readAllStandardOutput();if(output->size()>524288)process->kill();});
+    connect(process,&QProcess::readyReadStandardError,this,[process]{process->readAllStandardError();});
+    connect(process,QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),this,[finish](int,QProcess::ExitStatus){finish();});
+    connect(process,&QProcess::errorOccurred,this,[finish](QProcess::ProcessError error){if(error==QProcess::FailedToStart)finish();});
+    connect(process,&QProcess::started,this,[process,input]{process->write(QJsonDocument(input).toJson(QJsonDocument::Compact));process->closeWriteChannel();});
+    QTimer::singleShot(20000,process,[process]{if(process->state()!=QProcess::NotRunning)process->kill();});process->start();
+}
+void ShoutoutDock::sendDiagnostics(){
+    if(diagnosticBusy||preview||stopped)return;
+    diagnosticBusy=true;diagnosticSend->setEnabled(false);diagnosticResult->setText(t("diagnostic_busy"));
+    auto complete=[this](const QJsonObject &response){
+        diagnosticBusy=false;diagnosticSend->setEnabled(true);
+        if(response.value("ok").toBool()){
+            const auto id=response.value("result").toObject().value("id").toString();diagnosticPending={};
+            diagnosticResult->setText(t("diagnostic_sent")+"\n"+id);
+        }else{
+            const auto error=response.value("error").toString();
+            const auto key=(error=="channel_required"||error=="rate_limited"||error=="unavailable")?"diagnostic_"+error:QString("diagnostic_error");
+            diagnosticResult->setText(t(key.toUtf8().constData()));
+        }
+    };
+    auto confirm=[this,complete](const QJsonObject &response){
+        if(!response.value("ok").toBool()){complete(response);return;}
+        diagnosticPending=response.value("result").toObject();
+        const auto message=t("diagnostic_confirm").arg(diagnosticPending.value("channel").toString()).arg(diagnosticPending.value("hours").toInt()).arg(diagnosticPending.value("events").toArray().size());
+        if(QMessageBox::question(this,t("diagnostic_title"),message,QMessageBox::Yes|QMessageBox::No,QMessageBox::No)!=QMessageBox::Yes){
+            diagnosticPending={};diagnosticBusy=false;diagnosticSend->setEnabled(true);diagnosticResult->clear();return;
+        }
+        runDiagnostics("upload",diagnosticPending,complete);
+    };
+    const auto period=diagnosticPeriod->currentData().toInt();
+    const auto channel=state.value("account").toObject().value("channel").toString();
+    if(!diagnosticPending.isEmpty()&&diagnosticPending.value("hours").toInt()==period&&
+       (channel.isEmpty()||diagnosticPending.value("channel").toString()==channel)&&
+       QDateTime::currentMSecsSinceEpoch()-diagnosticPending.value("to").toInteger()<3600000){confirm({{"ok",true},{"result",diagnosticPending}});return;}
+    QJsonObject input{{"hours",period}};
+    if(!state.value("account").toObject().value("id").toString().isEmpty())input.insert("account",state.value("account"));
+    if(!state.isEmpty())input.insert("current",QJsonObject{{"prefs",state.value("prefs")},{"connected",workerReady&&state.value("connected").toBool()},
+        {"live",workerReady&&state.value("live").toBool()},{"people",state.value("people")},{"queue",state.value("queue")},
+        {"auth",QJsonObject{{"status",state.value("auth").toObject().value("status")},{"reauthRequired",state.value("auth").toObject().value("reauthRequired")}}}});
+    runDiagnostics("prepare",input,confirm);
 }
 void ShoutoutDock::startWorker(){
     if(stopped||(worker&&worker->state()!=QProcess::NotRunning))return;

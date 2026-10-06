@@ -3,6 +3,7 @@ build*/
 release/
 .deps/
 .test-data/
+test-output/
 *.sqlite*
 *.dpapi
 *.log

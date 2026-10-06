@@ -33,6 +33,7 @@ const {vault,prepareProfile,backupProfile,atomicWrite}=require('./core/vault.cjs
 const {exportBundle,importBundle,readDesktop}=require('./core/transfer.cjs');
 const {UpdateMonitor}=require('./core/update-monitor.cjs');
 const {ObsSession,HEARTBEAT_MS}=require('./core/session.cjs');
+const {Diagnostics}=require('./core/diagnostics.cjs');
 const VERSION=require('./package.json').version;
 
 async function main() {
@@ -41,6 +42,7 @@ async function main() {
   const demo=args.includes('--offline-demo'),recover=args.includes('--recover-worker');
   phase='backup';await prepareProfile(dir,VERSION);phase='database';
   const store=new Store(path.join(dir,'shoutouts.sqlite'),Date.now,{resumeQueue:recover});
+  const diagnostics=new Diagnostics(dir);
   // The checkbox pauses only this OBS session; startup never resets cooldowns.
   if(!recover)store.setPrefs({enabled:true});
   const secrets=vault(path.join(dir,'twitch-auth.dpapi'),helper);
@@ -66,12 +68,13 @@ async function main() {
     const account=store.lastAccount();
     const history=store.displayHistory(account.id);
     const people=store.people(account.id);
-    return {version:VERSION,account,auth:auth.view(),prefs:store.prefs(),people,history,notice,update:updates.view(),
+    const result={version:VERSION,account,auth:auth.view(),prefs:store.prefs(),people,history,notice,update:updates.view(),
       connected:!!engine?.ready,live:!!engine?.live,demo,language:store.meta('language','ru-RU'),
       botPath:botConnection?.exe||'',botConfigured:!!botConnection,
       queue:store.queueState(account.id).count,queueState:store.queueState(account.id),
       globalNextAt:store.globalNext(account.id),now:Date.now(),
       clientConfigured:!!(store.meta('clientId','')||require('./data/twitch-client.json').clientId)};
+    diagnostics.capture(account.id,result);return result;
   }
   let debounce;
   function changed(){clearTimeout(debounce);debounce=setTimeout(()=>emit({event:'state',data:state()}),80);}

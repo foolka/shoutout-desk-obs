@@ -11,6 +11,9 @@
 #include <QThread>
 #include <QTabWidget>
 #include <QTimer>
+#include <QComboBox>
+#include <QPushButton>
+#include <QScrollArea>
 #include <cstdio>
 
 class ShoutoutDockTest {
@@ -39,6 +42,14 @@ public:
         bool found=false;for(auto person:dock.state.value("people").toArray())if(person.toObject().value("login")=="recovery_guest")found=true;
         require(found,"People lost after recovery");
         require(QFileInfo::exists(profile.path()+"/worker-process.log"),"Diagnostic missing");
+        bool reportReady=false;
+        dock.runDiagnostics("prepare",{{"hours",24}},[&](QJsonObject response){
+            require(response.value("ok").toBool(),"Standalone diagnostic preparation failed");
+            const auto report=response.value("result").toObject();
+            require(report.value("channel").toString()=="demo_channel","Diagnostic channel missing");
+            require(!report.value("events").toArray().isEmpty(),"Diagnostic events missing");reportReady=true;
+        });
+        require(wait([&]{return reportReady;}),"Diagnostic helper timed out");
         const auto recoveredPid=dock.worker->processId();
         dock.workerLastReply=QDateTime::currentMSecsSinceEpoch()-46000;dock.checkWorker();
         require(wait([&]{return dock.workerReady&&dock.worker->processId()!=recoveredPid&&dock.worker->state()==QProcess::Running;}),"Heartbeat did not recover stalled worker");
@@ -58,6 +69,12 @@ public:
                 for(auto label:dock.historyBox->findChildren<QLabel*>())if(label->text().contains(dock.t("twitchConfirmed")))visibleConfirmation=true;
                 require(visibleConfirmation,"Localized Twitch confirmation missing from history UI");
                 require(dock.grab().save(output+"/history-"+language+"-"+QString::number(width)+".png"),"History screenshot failed");
+                dock.tabs->setCurrentIndex(2);QApplication::processEvents();
+                auto scroll=qobject_cast<QScrollArea*>(dock.tabs->widget(2));scroll->ensureWidgetVisible(dock.diagnosticResult);QApplication::processEvents();
+                require(dock.diagnosticPeriod->count()==3,"Diagnostic periods missing");
+                require(dock.diagnosticSend->text()==dock.t("diagnostic_send"),"Diagnostic locale missing");
+                require(dock.diagnosticSend->width()<dock.width(),"Diagnostic control overflows dock");
+                require(dock.grab().save(output+"/diagnostics-"+language+"-"+QString::number(width)+".png"),"Diagnostic screenshot failed");
                 dock.tabs->setCurrentIndex(0);
             }
         }

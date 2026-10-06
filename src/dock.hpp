@@ -57,6 +57,12 @@ private:
     QPointer<QMessageBox> authWarning;
     QTimer *authNoticeTimer = nullptr;
     QProcess *worker = nullptr;
+    QProcess *diagnosticProcess = nullptr;
+    bool diagnosticBusy = false;
+    QJsonObject diagnosticPending;
+    QComboBox *diagnosticPeriod = nullptr;
+    QPushButton *diagnosticSend = nullptr;
+    QLabel *diagnosticResult = nullptr;
     QTimer *workerRetryTimer = nullptr;
     bool workerReady = false, workerInitialized = false;
     int workerRestarts = 0;
@@ -91,6 +97,8 @@ private:
     QString t(const char *key) const;
     void build();
     void startWorker();
+    void sendDiagnostics();
+    void runDiagnostics(const QString &mode, const QJsonObject &input, std::function<void(QJsonObject)> callback);
     void workerFailed(const QString &message, const QString &reason, int code = 0, bool retry = true);
     void checkWorker();
     void renderQueue();

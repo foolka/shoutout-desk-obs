@@ -12,7 +12,7 @@ async function main(){
   mkdir(data);mkdir(path.join(plugin,'bin/64bit'));
   copy(path.join(root,'build/Release/shoutout-desk-obs.dll'),path.join(plugin,'bin/64bit/shoutout-desk-obs.dll'));
   copy(path.join(root,'build/Release/shoutout-secure.exe'),path.join(data,'shoutout-secure.exe'));
-  for(const file of ['worker.cjs','package.json','package-lock.json'])copy(path.join(root,file),path.join(data,file));
+  for(const file of ['worker.cjs','diagnostics-cli.cjs','package.json','package-lock.json'])copy(path.join(root,file),path.join(data,file));
   for(const dir of ['core','data'])fs.cpSync(path.join(root,dir),path.join(data,dir),{recursive:true});
   const prod=JSON.parse(fs.readFileSync(path.join(root,'package-lock.json'))).packages;
   for(const [relative,meta] of Object.entries(prod))if(relative&&relative.startsWith('node_modules/')&&!meta.dev)fs.cpSync(path.join(root,relative),path.join(data,relative),{recursive:true});

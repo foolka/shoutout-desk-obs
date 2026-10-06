@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.4 - 2026-10-06
+
+- Optional diagnostic reports: last hour, 24 hours or 7 days, sent only after confirmation.
+- A separate diagnostic helper can prepare a report even when the main worker is unavailable.
+- Reports are private to the fermionaplay.win owner and automatically expire after 30 days.
+- Allowlisted connection/queue events and per-report pseudonyms; no tokens, chat text or people database.
+- Existing profiles, history, cooldowns and authorization are preserved.
+
 ## 0.3.3 - 2026-10-06
 
 - Include previously stored Twitch-confirmed events in visible history, including shoutouts made by other tools. Do not label them as sent by this plugin.
