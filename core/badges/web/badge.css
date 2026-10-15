@@ -1,0 +1,38 @@
+*{box-sizing:border-box}
+html,body{margin:0}
+body.overlay{background:transparent;overflow:hidden;width:100vw;height:100vh}
+.badge-stage{position:relative;width:100%;height:100%;overflow:hidden}
+.badge-space{position:absolute;width:560px;height:560px;transform-origin:top left;display:flex;align-items:center;justify-content:center}
+.shoutout-badge{position:relative;display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:420px;gap:var(--gap);padding:var(--py) var(--px);border:var(--border) solid var(--border-color);border-radius:var(--radius);background:linear-gradient(var(--angle),var(--bg1),var(--bg2));color:var(--color);font-family:var(--font),sans-serif;letter-spacing:0;text-align:center;box-shadow:0 8px 0 var(--shadow);overflow:visible;will-change:transform,opacity;transform-origin:center}
+.badge-header{align-self:stretch;display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;font-weight:750;line-height:1.3;color:var(--muted)}
+.badge-header span:empty{display:none}
+.badge-avatar{flex-shrink:0;width:var(--avatar);height:var(--avatar);position:relative;border-radius:50%;overflow:hidden;background:var(--avatar-bg);border:4px solid var(--avatar-border);display:grid;place-items:center;color:var(--color);font-size:32px;font-weight:700}
+.badge-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.badge-copy{min-width:0;width:100%;flex:0 0 auto;display:flex;flex-direction:column;align-items:stretch}
+.badge-name{font-size:var(--name-size);font-weight:750;line-height:1.25;white-space:nowrap;padding:0 0 3px}
+.badge-name-text{display:inline-block}
+.badge-description{font-size:var(--description-size);color:var(--description-color);line-height:1.3;overflow-wrap:anywhere;text-wrap:pretty;margin-top:14px;padding:14px 8px 0;border-top:1px solid var(--border-color);background:var(--surface);border-radius:0 0 var(--radius) var(--radius)}
+.badge-description:empty{display:none}
+.badge-handle{font-size:12px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
+.badge-footer{font-size:11px;font-weight:700;line-height:1.3;color:var(--muted)}
+.shoutout-badge[data-design=air]:before{content:"";position:absolute;top:calc(-1 * var(--border));left:22px;right:22px;height:4px;border-radius:0 0 4px 4px;background:var(--accent)}
+.shoutout-badge[data-design=air] .badge-header span:first-child{padding:4px 9px;background:var(--accent);color:var(--accent-text);border-radius:3px}
+.shoutout-badge[data-design=pass]{padding-top:0;box-shadow:7px 9px 0 var(--shadow)}
+.shoutout-badge[data-design=pass] .badge-header{margin:0 calc(-1 * var(--px));padding:12px 16px;background:var(--accent);color:var(--accent-text);justify-content:space-between;border-radius:max(0px,calc(var(--radius) - var(--border))) max(0px,calc(var(--radius) - var(--border))) 0 0}
+.shoutout-badge[data-design=pass] .badge-avatar{border-radius:6px;border-width:4px}
+.shoutout-badge[data-design=pass] .badge-description{border-top-style:dashed;padding-bottom:10px}
+.shoutout-badge[data-design=sticker]{--sticker-header-offset:18px;padding:var(--py) 0;border:0;border-radius:0;background:none;box-shadow:none;gap:0}
+.shoutout-badge[data-design=sticker] .badge-header,.shoutout-badge[data-design=sticker] .badge-footer{display:none}
+.shoutout-badge[data-design=sticker] .badge-avatar{width:calc(var(--avatar) + 30px);height:calc(var(--avatar) + 30px);margin-bottom:calc(var(--gap) / -2);border-width:6px;box-shadow:3px 5px 0 var(--shadow);transform:translateY(var(--sticker-header-offset)) rotate(5deg);z-index:1}
+.shoutout-badge[data-design=sticker] .badge-name{padding:12px var(--px);position:relative;z-index:2;background:var(--accent);border:var(--border) solid var(--border-color);border-radius:var(--radius);transform:translateY(var(--sticker-header-offset)) rotate(-3deg);box-shadow:3px 5px 0 var(--shadow)}
+.shoutout-badge[data-design=sticker] .badge-description{order:1;margin:0 10px;padding:max(calc(var(--gap) + 6px),36px) var(--px) var(--py);border:var(--border) solid var(--border-color);border-top:0;background:linear-gradient(var(--angle),var(--bg1),var(--bg2));box-shadow:3px 5px 0 var(--shadow)}
+.shoutout-badge[data-design=sticker] .badge-handle{display:none}
+.badge-stamp-slot{position:absolute;pointer-events:none;z-index:3}
+.badge-stamp-slot[data-position^=top]{top:8px}
+.badge-stamp-slot[data-position^=bottom]{bottom:8px}
+.shoutout-badge[data-design=pass] .badge-stamp-slot[data-position^=top]{top:48px}
+.badge-stamp-slot[data-position$=right]{right:-12px}
+.badge-stamp-slot[data-position$=left]{left:-12px}
+.badge-stamp{position:absolute;left:50%;top:50%;display:flex;align-items:center;justify-content:center;width:var(--stamp-size);height:calc(var(--stamp-size) * .34);padding:6px 9px;border:5px double currentColor;border-radius:3px;transform:translate(-50%,-50%) rotate(var(--stamp-angle));font-family:Impact,'Arial Narrow',sans-serif;font-weight:900;line-height:1.05;letter-spacing:0;mask-image:url('/stamp-ink.png');mask-size:256px 128px;-webkit-mask-image:url('/stamp-ink.png');-webkit-mask-size:256px 128px}
+.badge-stamp span{display:block;max-width:100%;white-space:nowrap;line-height:1.05}
+[hidden]{display:none!important}

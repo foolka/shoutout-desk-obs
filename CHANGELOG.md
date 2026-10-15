@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0 - 2026-10-15
+
+- Add local OBS shoutout badges with a centered avatar, a one-line nickname and an optional personal description.
+- Open the badge editor from the dock or a person's row; test a badge without sending a real Twitch shoutout.
+- Include three designs (Air, Pass and Sticker), each with independent editable colors and common or per-streamer themes.
+- Add global/per-streamer display switches, a copyable persistent source URL and the default 560 x 560 source size.
+- Customize padding, border, corners, gradients, fonts, text sizes, avatar size, spacing and display duration.
+- Choose entrance and exit animations independently from ten effects each, with reduced-motion support.
+- Add a floating textured stamp with editable text, color, corner, angle and size, without shifting other badge content.
+- Fit long nicknames on one line, enlarge and wrap descriptions, and refine Sticker's overlapping header and stamp. Sticker no longer shows a redundant address label.
+- Coalesce duplicate Twitch confirmations and ignore failed, uncertain and stale events. Test badges leave history and cooldowns unchanged.
+- Preserve badge descriptions, themes and the source token in the same local profile across restarts and in-place upgrades. No database migration is introduced.
+
 ## 0.3.4 - 2026-10-06
 
 - Optional diagnostic reports: last hour, 24 hours or 7 days, sent only after confirmation.

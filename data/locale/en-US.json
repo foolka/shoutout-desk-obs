@@ -1,4 +1,6 @@
 {
+  "badges": "Badges",
+  "badgeTest": "Test badge in OBS",
   "twitchConfirmed": "Confirmed by Twitch",
   "workerUnavailable": "Local worker stopped",
   "workerMissing": "Missing plugin file: %1. Close OBS and reinstall the plugin. Do not delete your data folder.",

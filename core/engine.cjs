@@ -11,8 +11,8 @@ function chatUser(data) {
   };
 }
 class Engine {
-  constructor(store,bridge,onChange=()=>{}) {
-    this.store=store;this.bridge=bridge;this.onChange=onChange;
+  constructor(store,bridge,onChange=()=>{},onShoutout=()=>{}) {
+    this.store=store;this.bridge=bridge;this.onChange=onChange;this.onShoutout=onShoutout;
     const last=store.lastAccount();this.account=last.id;this.channel=last.channel;
     this.live=false;this.ready=false;this.busy=false;this.stopped=false;this.connectionEpoch=0;this.streamId=store.meta('queueStreamId:'+last.id,'');
   }
@@ -72,10 +72,11 @@ class Engine {
     const account=String(data.broadcaster?.id||'');
     if(!account||account!==this.account)return;
     const stamp=Date.parse(data.startedAt||data.createdAt||'');
-    try{if(this.store.observeShoutout(account,data.user?.login,stamp))this.onChange();}catch{ /* Ignore malformed event identities. */ }
+    try{if(this.store.observeShoutout(account,data.user?.login,stamp))this.onChange();this.announce({account,login:data.user?.login,stamp});}catch{ /* Ignore malformed event identities. */ }
   }
+  announce(data){try{this.onShoutout(data);}catch{ /* Visuals do not control shoutout delivery. */ }}
   apply(row,result) {
-    if(result.status==='sent') this.store.finish(row.id,'sent','',Number(result.sentAt)||this.store.now());
+    if(result.status==='sent') {const stamp=Number(result.sentAt)||this.store.now();this.store.finish(row.id,'sent','',stamp);this.announce({account:row.account,login:row.login,stamp,profile:result.profile});}
     else if(result.status==='deferred') this.store.defer(row.id,result.detail);
     else if(result.status==='offline') { this.store.finish(row.id,'cancelled','Канал не в эфире'); this.live=false;this.store.cancelQueue('Канал не в эфире'); }
     else if(result.status==='cancelled'||(result.status==='rate_limited'&&!this.store.canSend(row.id))) this.store.finish(row.id,'cancelled',result.detail||'Шотаут уже сделан в канале или очередь отменена');

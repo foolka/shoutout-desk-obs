@@ -43,6 +43,11 @@ public class CPHInline
                     bool live = ((JArray)streams["data"]).Count > 0;
                     if (op == "status")
                         reply = new JObject { ["status"] = "ok", ["live"] = live, ["account"] = broadcasterId, ["channel"] = broadcaster.UserLogin };
+                    else if (op == "profile" && Regex.IsMatch(login ?? "", "^[a-z0-9_]{1,25}$"))
+                    {
+                        var users = (JArray)Get(client, "users?login=" + Uri.EscapeDataString(login))["data"];
+                        reply = new JObject { ["status"] = "ok", ["profile"] = users.Count == 0 ? null : new JObject { ["displayName"] = users[0]["display_name"], ["avatarUrl"] = users[0]["profile_image_url"] } };
+                    }
                     else if (op == "send" && IsGuid(operation) && account == broadcasterId && Regex.IsMatch(login ?? "", "^[a-z0-9_]{1,25}$"))
                     {
                         var ledger = LoadLedger();
@@ -67,7 +72,10 @@ public class CPHInline
                                     {
                                         int code = (int)response.StatusCode;
                                         reply = new JObject { ["status"] = code == 204 ? "sent" : code == 429 ? "rate_limited" : code >= 500 ? "unknown" : "failed", ["http"] = code };
-                                        if (code == 204) reply["sentAt"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                                        if (code == 204) {
+                                            reply["sentAt"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                                            reply["profile"] = new JObject { ["displayName"] = users[0]["display_name"], ["avatarUrl"] = users[0]["profile_image_url"] };
+                                        }
                                         else reply["detail"] = code == 401 || code == 403 ? "Проверьте авторизацию Twitch и право на шотауты в Streamer.bot" : "Twitch отклонил запрос: HTTP " + code;
                                     }
                                 }

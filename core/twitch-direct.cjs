@@ -42,6 +42,7 @@ class DirectBridge extends EventEmitter {
       shoutout=listener.onChannelShoutoutCreate(this.target.id,this.actor,event=>{
         if(this.closed||epoch!==this.epoch||event.broadcasterId!==this.target.id)return;
         this.store.observeShoutout(this.target.id,event.shoutedOutBroadcasterName,event.startDate.getTime());this.emit('changed');
+        this.emit('badgeShoutout',{account:this.target.id,login:event.shoutedOutBroadcasterName,stamp:event.startDate.getTime()});
       });
       raid=listener.onChannelRaidTo(this.target.id,event=>{
         if(!this.ready||this.closed||epoch!==this.epoch||event.raidedBroadcasterId!==this.target.id)return;
@@ -59,6 +60,10 @@ class DirectBridge extends EventEmitter {
     if(this.closed)throw publicError('Подключение закрыто.');
     if(op==='probe')return {status:'unknown'};
     if(!this.api)throw publicError('Twitch ещё не подключён.');
+    if(op==='profile'){
+      const user=await this.api.asUser(this.actor,api=>api.users.getUserByName(args.login));
+      return {profile:user?{displayName:user.displayName,avatarUrl:user.profilePictureUrl}:null};
+    }
     if(op==='status'){
       const stream=await deadline((async()=>{await this.auth.validate();return this.api.asUser(this.actor,api=>api.streams.getStreamByUserId(this.target.id));})(),this.prepareTimeoutMs);
       return {status:'ok',account:this.target.id,channel:this.target.login,live:!!stream,streamId:stream?.id||''};
@@ -90,7 +95,7 @@ class DirectBridge extends EventEmitter {
         if(args.canSend&&!args.canSend())return {status:'cancelled',detail:'Шотаут уже сделан в канале или очередь отменена'};
         response=await post(refreshed.accessToken);
       }
-      if(response.status===204)return {status:'sent',sentAt:Date.now()};
+      if(response.status===204)return {status:'sent',sentAt:Date.now(),profile:{displayName:target.displayName,avatarUrl:target.profilePictureUrl}};
       if(response.status===429)return {status:'rate_limited'};
       if(response.status>=500)return {status:'unknown'};
       if(response.status===403)this.fail('Twitch запретил шотаут. Проверьте права и ограничения канала.',this.epoch,false);

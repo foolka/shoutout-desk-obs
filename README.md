@@ -1,5 +1,7 @@
 # Shoutout Desk OBS
 
+**New in 0.4.0: [shoutout badges](#badges)** with three designs, personal descriptions, a floating stamp and separate entrance/exit animations.
+
 [English](README.md) | [Українська](README.uk.md) | [Русский](README.ru.md)
 
 Automatic Twitch shoutouts inside a dockable OBS Studio panel. A person from your list is shouted out when they write in chat after their cooldown expires.
@@ -51,6 +53,18 @@ A normal update on the same Windows profile preserves your data automatically: c
 5. People, history and cooldowns are **merged**, not replaced; importing again does not duplicate the same history. Pending actions are not replayed. Automation pauses after import: check the result and enable it when ready.
 
 Authorization is not imported. Keep the backup until you verify the result. The new database uses schema 3; to downgrade, restore a backup made before the upgrade instead of opening the migrated database with an old version.
+
+<a id="badges"></a>
+## Shoutout Badges
+
+Open **Badges** from the dock or a person's row. Copy the source URL from the editor and add an OBS **Browser Source** sized **560 × 560**. The transparent source uses local port `18772` while the OBS plugin runs. Its complete URL stays the same across restarts in the same profile; do not use the editor address as the source.
+
+- **Air / Pass / Sticker:** three designs with independent color palettes. A centered avatar, one-line nickname and optional wrapped description. Long names shrink automatically; Sticker has no redundant address label.
+- Global/per-person display switches, descriptions up to 140 characters, common or personal themes. Customize gradients, borders, corners, padding, fonts, colors and sizes.
+- Ten entrance and ten exit effects, selected independently, plus display duration. Enable and customize the floating stamp's text, color, corner, angle and sizes without shifting the content.
+- **Test in OBS** and the person's test button display only a badge, without sending a Twitch shoutout or changing history/cooldowns, even if automatic display is disabled. Automatic display requires a fresh confirmed shoutout for a person in your list; duplicate confirmations are coalesced.
+
+Click **Save** after editing. The badge editor currently uses Russian labels. Streamer.bot users should rerun bridge setup for avatar support. Close OBS before installing the update over the existing version and keep the same profile. Badge descriptions, themes and the source URL live in the profile, not the ordinary people-list JSON export; retain the complete data folder for a full transfer. Do not publish the editor URL. Use only one active app/plugin per channel.
 
 <a id="setup"></a>
 ## Setup

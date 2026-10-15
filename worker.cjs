@@ -34,6 +34,7 @@ const {exportBundle,importBundle,readDesktop}=require('./core/transfer.cjs');
 const {UpdateMonitor}=require('./core/update-monitor.cjs');
 const {ObsSession,HEARTBEAT_MS}=require('./core/session.cjs');
 const {Diagnostics}=require('./core/diagnostics.cjs');
+const {Badges}=require('./core/badges/service.cjs');
 const VERSION=require('./package.json').version;
 
 async function main() {
@@ -56,6 +57,11 @@ async function main() {
   try{if(!demo)botConnection=botSecrets.load();}catch{notice='Повторите автонастройку Streamer.bot. Список и история сохранены.';}
   const auth=new TwitchAuth({saved,save:v=>secrets.save(v),pending,savePending:v=>pendingSecrets.save(v)});
   const session=new ObsSession(store);
+  const badges=new Badges({store,account:()=>store.lastAccount().id,port:demo?0:18772,profile:async login=>{
+    if(demo)return null;
+    const result=await bridge?.call('profile',{login});return result?.profile||null;
+  }});
+  await badges.start().catch(()=>{});
   const emit=value=>{if(!closing)process.stdout.write(JSON.stringify(value)+'\n');};
   if(demo){
     store.rememberAccount('999001','demo_channel');
@@ -86,7 +92,8 @@ async function main() {
     const epoch=generation,user=bot?store.meta('botAccount',null):auth.saved.user;
     if(user)store.rememberAccount(user.id,user.login||user.channel);
     const current=bridge=bot?new Bridge(botConnection):new DirectBridge({auth,target:{id:user.id,login:user.login},store});
-    engine=new Engine(store,current,changed);
+    engine=new Engine(store,current,changed,data=>badges.confirm(data));
+    current.on('badgeShoutout',data=>{if(epoch===generation)badges.confirm(data);});
     current.on('ready',async()=>{
       if(epoch!==generation)return;
       const active=engine;
@@ -114,6 +121,8 @@ async function main() {
   auth.on('expired',()=>{if(store.prefs().provider==='direct'){disconnect();notice=auth.message;changed();}});
   const commands={
     state:async()=>state(),
+    badges:async p=>({url:badges.editor(p.login||''),...badges.info(),editorUrl:badges.editor(p.login||'')}),
+    badgeTest:async p=>badges.test(p.login),
     add:async p=>{const name=store.add(p.login);changed();return name;},
     remove:async p=>{store.remove(p.login);changed();},
     prefs:async p=>{
@@ -170,7 +179,7 @@ async function main() {
     quit:async()=>shutdown()
   };
   function shutdown(){
-    if(closing)return;disconnect();closing=true;updates.stop();auth.dispose();clearTimeout(debounce);clearInterval(tick);clearInterval(refresh);clearInterval(heartbeat);session.close();store.close();process.exit(0);
+    if(closing)return;disconnect();closing=true;badges.close();updates.stop();auth.dispose();clearTimeout(debounce);clearInterval(tick);clearInterval(refresh);clearInterval(heartbeat);session.close();store.close();process.exit(0);
   }
   const heartbeat=setInterval(()=>{session.touch();store.checkpoint();},HEARTBEAT_MS);
   const tick=setInterval(()=>{if(engine)void engine.tick().catch(()=>{notice='Ошибка обработки очереди. Переподключитесь.';disconnect();changed();});},1000);

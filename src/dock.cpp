@@ -145,6 +145,8 @@ void ShoutoutDock::build(){
     auto addName=[this]{const auto value=addEdit->text().trimmed();if(!value.isEmpty())command("add",{{"login",value}},[this](QJsonValue){addEdit->clear();});};
     connect(add,&QToolButton::clicked,this,addName);connect(addEdit,&QLineEdit::returnPressed,this,addName);
     search=new QLineEdit;search->setObjectName("searchName");search->setPlaceholderText(t("search"));search->setClearButtonEnabled(true);p->addWidget(search);
+    auto badgesButton=button(t("badges"),"contact-round");badgesButton->setObjectName("badgesButton");p->addWidget(badgesButton);
+    connect(badgesButton,&QPushButton::clicked,this,[this]{command("badges",{},[this](QJsonValue result){openUrl(result.toObject().value("editorUrl").toString());});});
     auto filters=new QHBoxLayout;filters->setSpacing(4);sort=new QComboBox;sort->addItems({t("newest"),t("oldest"),t("nameAZ")});sort->setMinimumWidth(88);filters->addWidget(sort,1);
     since=new QDateEdit;since->setCalendarPopup(true);since->setMinimumDate(QDate(2000,1,1));since->setDate(since->minimumDate());since->setSpecialValueText(t("allDates"));since->setDisplayFormat("dd.MM.yyyy");since->setToolTip(t("addedSince"));since->setFixedWidth(138);filters->addWidget(since);
     auto resetDate=tool("x",t("clearDate"));resetDate->setFixedWidth(26);filters->addWidget(resetDate);p->addLayout(filters);
@@ -449,7 +451,8 @@ void ShoutoutDock::openUrl(const QString &value){
     const QUrl url(value);
     const bool twitch=url.scheme()=="https"&&url.host()=="www.twitch.tv"&&url.path()=="/activate";
     const bool repo=url.scheme()=="https"&&url.host()=="github.com"&&(url.path()=="/foolka/shoutout-desk-obs"||url.path().startsWith("/foolka/shoutout-desk-obs/"));
-    if(twitch||repo)QDesktopServices::openUrl(url);
+    const bool badges=url.scheme()=="http"&&url.host()=="127.0.0.1"&&url.port()>0&&url.path()=="/editor";
+    if(twitch||repo||badges)QDesktopServices::openUrl(url);
 }
 void ShoutoutDock::render(){
     painting=true;
@@ -506,10 +509,14 @@ void ShoutoutDock::renderPeople(){
     if(rows.isEmpty()){auto empty=label(list.isEmpty()?t("emptyPeople"):t("noResults"),"empty");empty->setMinimumHeight(100);empty->setAlignment(Qt::AlignCenter);peopleLayout->addWidget(empty);return;}
     for(auto row:rows){
         auto chip=new QFrame;chip->setObjectName("person");chip->setFixedHeight(48);auto line=new QHBoxLayout(chip);line->setContentsMargins(10,4,4,4);line->setSpacing(6);
-        auto text=new QVBoxLayout;text->setSpacing(1);auto name=label(row.value("login").toString(),"personName");name->setWordWrap(false);text->addWidget(name);
+        auto text=new QVBoxLayout;text->setSpacing(1);auto name=label(row.value("login").toString(),"personName");name->setWordWrap(false);name->setMaximumWidth(140);name->setToolTip(row.value("login").toString());name->setText(name->fontMetrics().elidedText(row.value("login").toString(),Qt::ElideRight,140));text->addWidget(name);
         const qint64 remaining=row.value("nextAt").toInteger()-now;
         const auto caption=row.value("queued").toBool()?t("queued"):remaining<=0?t("ready"):t("remaining").arg((remaining+59999)/60000/60).arg(((remaining+59999)/60000)%60);
         auto status=label(caption,"personStatus");status->setWordWrap(false);text->addWidget(status);line->addLayout(text);
+        auto badge=tool("contact-round",t("badges"));badge->setFixedSize(26,28);line->addWidget(badge);
+        connect(badge,&QToolButton::clicked,this,[this,row]{command("badges",{{"login",row.value("login")}},[this](QJsonValue result){openUrl(result.toObject().value("editorUrl").toString());});});
+        auto test=tool("play",t("badgeTest"));test->setFixedSize(26,28);line->addWidget(test);
+        connect(test,&QToolButton::clicked,this,[this,row]{command("badgeTest",{{"login",row.value("login")}});});
         auto remove=tool("x",t("remove"));remove->setFixedSize(26,28);line->addWidget(remove);
         connect(remove,&QToolButton::clicked,this,[this,row]{command("remove",{{"login",row.value("login")}});});peopleLayout->addWidget(chip);
     }
