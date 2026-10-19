@@ -147,6 +147,16 @@ EXE и ZIP находятся в **GitHub Releases**, исходники хра�
 <a id="screenshots"></a>
 ## Скриншоты
 
+Три оформления бейджиков с аватаром, ником, описанием и штампом. Цвета настраиваются отдельно для каждого оформления. Ниже реальный локальный редактор с вымышленным аккаунтом.
+
+![Бейдж «Эфир»](docs/screenshots/ru-RU/badge-air.png)
+
+![Бейдж «Пропуск»](docs/screenshots/ru-RU/badge-pass.png)
+
+![Бейдж «Стикер»](docs/screenshots/ru-RU/badge-sticker.png)
+
+![Редактор бейджиков: описание и цвета](docs/screenshots/ru-RU/badge-editor.png)
+
 ![Настройка](docs/screenshots/ru-RU/streamerbot.png)
 
 ![Настройки и кнопки](docs/screenshots/ru-RU/settings-data.png)

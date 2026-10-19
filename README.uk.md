@@ -147,6 +147,16 @@ EXE і ZIP розміщуються у **GitHub Releases**, код зберіг�
 <a id="screenshots"></a>
 ## Знімки екрана
 
+Три оформлення бейджів з аватаром, ніком, описом і штампом. Кольори налаштовуються окремо для кожного оформлення. Нижче справжній локальний редактор з вигаданим акаунтом. Редактор поки російськомовний; текст бейджа можна написати своєю мовою.
+
+![Бейдж «Ефір»](docs/screenshots/uk-UA/badge-air.png)
+
+![Бейдж «Перепустка»](docs/screenshots/uk-UA/badge-pass.png)
+
+![Бейдж «Стикер»](docs/screenshots/uk-UA/badge-sticker.png)
+
+![Редактор бейджів: опис і кольори](docs/screenshots/uk-UA/badge-editor.png)
+
 ![Налаштування](docs/screenshots/uk-UA/streamerbot.png)
 
 ![Параметри та кнопки](docs/screenshots/uk-UA/settings-data.png)

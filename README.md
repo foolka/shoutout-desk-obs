@@ -147,6 +147,16 @@ EXE/ZIP binaries are attached to **GitHub Releases**, not committed into source 
 <a id="screenshots"></a>
 ## Screenshots
 
+Three badge designs with an avatar, name, description and stamp. Each design has its own editable colors. These are real local-editor screenshots with a fictional account. The editor is currently in Russian; badge text can use your own language.
+
+![On Air badge](docs/screenshots/en-US/badge-air.png)
+
+![Pass badge](docs/screenshots/en-US/badge-pass.png)
+
+![Sticker badge](docs/screenshots/en-US/badge-sticker.png)
+
+![Badge editor: description and colors](docs/screenshots/en-US/badge-editor.png)
+
 ![Setup](docs/screenshots/en-US/streamerbot.png)
 
 ![Settings and controls](docs/screenshots/en-US/settings-data.png)
