@@ -8,7 +8,7 @@
 - Add Terminal, Ticket and Portrait alongside Air, Pass and Sticker, each with its own editable palette.
 - Add badge width, background/shadow opacity, shadow blur/offset, border style, avatar shape/outline, text weights, captions, label switches and stamp X/Y/opacity controls.
 - Preserve existing people, history, descriptions, palettes, source URLs, authorization and installation identity. New style defaults are applied on read without rewriting old settings; no database schema migration.
-- Verify legacy profiles, queue races, long names, all six themes, mobile editors and stale OBS-page reloads using isolated data.
+- Verify legacy profiles, queue races, long names, all six themes, mobile editors and source reconnection using isolated data. Close OBS before replacing the plugin so its browser source starts with the updated renderer.
 
 ## 0.4.0 - 2026-10-15
 
