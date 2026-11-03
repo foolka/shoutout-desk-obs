@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0 - 2026-11-03
+
+- Give incoming raids priority over queued chat shoutouts, including when the guest message arrives first. Recheck priority before direct Twitch delivery.
+- Allow a new raid to bypass the app's personal timeout. Keep Twitch's two-minute channel gap and sixty-minute target cooldown, including observed cooldown timestamps and after a local timeout reset.
+- Keep a raid waiting for Twitch for up to two hours instead of dropping it after three rate-limit responses or thirty minutes. A new confirmed shoutout can satisfy that raid without a duplicate.
+- Add Terminal, Ticket and Portrait alongside Air, Pass and Sticker, each with its own editable palette.
+- Add badge width, background/shadow opacity, shadow blur/offset, border style, avatar shape/outline, text weights, captions, label switches and stamp X/Y/opacity controls.
+- Preserve existing people, history, descriptions, palettes, source URLs, authorization and installation identity. New style defaults are applied on read without rewriting old settings; no database schema migration.
+- Verify legacy profiles, queue races, long names, all six themes, mobile editors and stale OBS-page reloads using isolated data.
+
 ## 0.4.0 - 2026-10-15
 
 - Add local OBS shoutout badges with a centered avatar, a one-line nickname and an optional personal description.

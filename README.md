@@ -1,6 +1,6 @@
 # Shoutout Desk OBS
 
-**New in 0.4.0: [shoutout badges](#badges)** with three designs, personal descriptions, a floating stamp and separate entrance/exit animations.
+**0.5.0: Raid priority, repeat raid shoutouts within Twitch limits and six customizable badge designs.**
 
 [English](README.md) | [Українська](README.uk.md) | [Русский](README.ru.md)
 
@@ -59,7 +59,7 @@ Authorization is not imported. Keep the backup until you verify the result. The 
 
 Open **Badges** from the dock or a person's row. Copy the source URL from the editor and add an OBS **Browser Source** sized **560 × 560**. The transparent source uses local port `18772` while the OBS plugin runs. Its complete URL stays the same across restarts in the same profile; do not use the editor address as the source.
 
-- **Air / Pass / Sticker:** three designs with independent color palettes. A centered avatar, one-line nickname and optional wrapped description. Long names shrink automatically; Sticker has no redundant address label.
+- **Air / Pass / Sticker / Terminal / Ticket / Portrait:** Six designs, each with independent editable colors. Existing themes and descriptions are preserved. Customize width, background and shadow opacity, shadow blur and offset, border style, avatar shape and outline, font weights, captions, visible labels and stamp X/Y offsets. Long names shrink to one line; descriptions wrap.
 - Global/per-person display switches, descriptions up to 140 characters, common or personal themes. Customize gradients, borders, corners, padding, fonts, colors and sizes.
 - Ten entrance and ten exit effects, selected independently, plus display duration. Enable and customize the floating stamp's text, color, corner, angle and sizes without shifting the content.
 - **Test in OBS** and the person's test button display only a badge, without sending a Twitch shoutout or changing history/cooldowns, even if automatic display is disabled. Automatic display requires a fresh confirmed shoutout for a person in your list; duplicate confirmations are coalesced.
@@ -106,7 +106,7 @@ Run **one active instance per channel**: either this app or the OBS plugin. Sepa
 <a id="updates"></a>
 ### Incoming raids
 
-**Shout out incoming raiders** is off by default. When enabled, an incoming raid during a live stream queues its streamer for **at least 20 seconds**, even if they are not in your saved list. It does not add them to the list. Personal cooldowns, the 125-second channel gap and Twitch limits can postpone or prevent sending.
+**Shout out incoming raiders** is off by default. When enabled, a raider takes priority over queued chat shoutouts, even outside your saved list, without being added to it. The 20-second settling delay still allows another bot to satisfy the raid. Our personal timeout does not block a new raid; Twitch still allows one shoutout every 2 minutes and the same channel once per 60 minutes, with a 5-second safety margin. A waiting raid reserves the queue until it is eligible (up to two hours), so chat entries cannot overtake it. A shoutout already sent before the raid notification arrived cannot be undone. A confirmed shoutout made after this raid cancels its duplicate; older confirmations only delay it.
 
 An actual Twitch shoutout observed from another bot during the wait cancels the duplicate. A plain chat message or a text-only `!so` command is not a Twitch shoutout event. This protection requires a working connection; independent bots cannot be coordinated with an absolute guarantee.
 
@@ -147,13 +147,19 @@ EXE/ZIP binaries are attached to **GitHub Releases**, not committed into source 
 <a id="screenshots"></a>
 ## Screenshots
 
-Three badge designs with an avatar, name, description and stamp. Each design has its own editable colors. These are real local-editor screenshots with a fictional account. The editor is currently in Russian; badge text can use your own language.
+Six badge designs with separate editable palettes. These are real screenshots with a fictional account. The local badge editor is currently in Russian; badge text can use your own language.
 
 ![On Air badge](docs/screenshots/en-US/badge-air.png)
 
 ![Pass badge](docs/screenshots/en-US/badge-pass.png)
 
 ![Sticker badge](docs/screenshots/en-US/badge-sticker.png)
+
+![Terminal](docs/screenshots/en-US/badge-terminal.png)
+
+![Ticket](docs/screenshots/en-US/badge-ticket.png)
+
+![Portrait](docs/screenshots/en-US/badge-frame.png)
 
 ![Badge editor: description and colors](docs/screenshots/en-US/badge-editor.png)
 

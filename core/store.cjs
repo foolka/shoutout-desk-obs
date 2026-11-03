@@ -115,11 +115,17 @@ class Store {
       this.db.exec('COMMIT');return true;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
-  observeShoutout(account,login,stamp){
+  observeShoutout(account,login,stamp,cooldowns={}){
     if(!account||!Number.isFinite(stamp)||stamp<=0||stamp>this.now()+60000)return false;
     login=normalizeLogin(login);
     this.db.prepare('INSERT OR IGNORE INTO observed_shoutouts VALUES (?,?,?)').run(account,login,stamp);
-    if(this.nextAt(account,login)>this.now())this.db.prepare("UPDATE attempts SET status='cancelled',detail='Шотаут уже сделан в канале',finished_at=? WHERE account=? AND login=? AND status='queued'").run(this.now(),account,login);
+    for(const [name,value] of [['global',cooldowns.global],['target:'+login,cooldowns.target]]){
+      if(Number.isFinite(value)&&value>=stamp&&value<=stamp+24*3600000){
+        const key='twitchCooldown:'+account+':'+name;
+        this.setMeta(key,Math.max(this.meta(key,0),value+5000));
+      }
+    }
+    if(this.nextAt(account,login)>this.now())this.db.prepare("UPDATE attempts SET status='cancelled',detail='Шотаут уже сделан в канале',finished_at=? WHERE account=? AND login=? AND status='queued' AND (trigger!='raid' OR created_at<=?)").run(this.now(),account,login,stamp);
     return true;
   }
   canSend(id){
@@ -128,8 +134,30 @@ class Store {
     if(row.trigger==='raid'?!this.prefs().raidShoutouts:!this.db.prepare('SELECT 1 FROM channel_people WHERE account=? AND login=? AND active=1').get(row.account,row.login))return false;
     // Exclude this attempt's own in-flight reservation from the final check.
     if(row.started_at<=this.cooldownResetAt(row.account))return false;
+    if(this.targetNext(row.account,row.login,row.id)>this.now())return false;
     const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=? AND stamp>?').get(row.account,row.login,this.cooldownResetAt(row.account)).stamp;
-    return observed==null||observed+this.prefs().cooldownHours*3600000<=this.now();
+    return row.trigger==='raid'||observed==null||observed+this.prefs().cooldownHours*3600000<=this.now();
+  }
+  // Twitch limits survive a local reset and include uncertain deliveries.
+  targetNext(account,login,excludeId=''){
+    const sent=this.db.prepare("SELECT MAX(CASE WHEN status='sent' THEN finished_at ELSE started_at END) AS stamp FROM attempts WHERE account=? AND login=? AND id!=? AND status IN ('sent','sending','uncertain')").get(account,login,excludeId).stamp;
+    const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=?').get(account,login).stamp;
+    return Math.max(sent==null?0:sent+3605000,observed==null?0:observed+3605000,this.meta('twitchCooldown:'+account+':target:'+login,0));
+  }
+  // An arriving raid can preempt chat preparation, but never an already sent POST.
+  raidAhead(row){
+    return row.trigger!=='raid'&&!!this.db.prepare("SELECT 1 FROM attempts WHERE account=? AND status='queued' AND trigger='raid' AND created_at>=? LIMIT 1").get(row.account,this.now()-2*3600000);
+  }
+  deferForRaid(id){
+    this.db.prepare("UPDATE attempts SET status='queued',started_at=NULL,finished_at=NULL,retry_at=0,tries=MAX(0,tries-1),detail='Приоритет входящего рейда' WHERE id=? AND status='sending'").run(id);
+  }
+  waitForTarget(row){
+    if(row.trigger!=='raid'||!this.prefs().enabled||!this.prefs().raidShoutouts)return false;
+    const latest=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=? AND login=?').get(row.account,row.login).stamp;
+    const next=this.targetNext(row.account,row.login,row.id);
+    if((latest!=null&&latest>=row.created_at)||next<=this.now()||row.started_at<=this.cooldownResetAt(row.account))return false;
+    this.db.prepare("UPDATE attempts SET status='queued',started_at=NULL,finished_at=NULL,not_before=?,detail='Ожидание часового лимита Twitch' WHERE id=? AND status='sending'").run(next,row.id);
+    return true;
   }
   nextAt(account,login) {
     const stamp = this.last(account,login);
@@ -147,11 +175,11 @@ class Store {
     this.claimDraft(account);
     if (!account || !this.prefs().enabled) return null;
     if(trigger==='raid'?!this.prefs().raidShoutouts:!this.db.prepare('SELECT 1 FROM channel_people WHERE account=? AND login=? AND active=1').get(account,login))return null;
-    if (this.nextAt(account,login) > this.now()) return null;
+    if (trigger!=='raid'&&this.nextAt(account,login) > this.now()) return null;
     const existing=this.db.prepare("SELECT * FROM attempts WHERE account=? AND login=? AND status IN ('queued','sending')").get(account,login);
     if(existing){
       if(trigger==='raid'&&existing.trigger==='chat'&&existing.status==='queued'){
-        this.db.prepare("UPDATE attempts SET trigger='raid',not_before=? WHERE id=?").run(this.now()+20000,existing.id);
+        this.db.prepare("UPDATE attempts SET trigger='raid',created_at=?,not_before=?,retry_at=0 WHERE id=?").run(this.now(),this.now()+20000,existing.id);
         return existing.id;
       }
       return null;
@@ -165,25 +193,27 @@ class Store {
       WHERE account=? AND status IN ('sent','sending','uncertain')`).get(account).stamp;
     const block = this.db.prepare("SELECT MAX(retry_at) AS stamp FROM attempts WHERE account=? AND status='queued'").get(account).stamp;
     const observed=this.db.prepare('SELECT MAX(stamp) AS stamp FROM observed_shoutouts WHERE account=?').get(account).stamp;
-    return Math.max(stamp == null ? 0 : stamp+125000, block || 0,observed==null?0:observed+125000);
+    return Math.max(stamp == null ? 0 : stamp+125000, block || 0,observed==null?0:observed+125000,this.meta('twitchCooldown:'+account+':global',0));
   }
   queueState(account,settleMs=10000){
     const rows=this.db.prepare("SELECT * FROM attempts WHERE account=? AND status IN ('queued','sending') ORDER BY created_at,rowid").all(account);
     const sending=rows.find(row=>row.status==='sending');
     if(sending)return {count:rows.length,login:sending.login,sending:true,nextAt:0};
     const now=this.now(),global=this.globalNext(account);
-    const eligible=rows.filter(row=>row.created_at>=now-30*60000);
-    const time=row=>Math.max(global,row.not_before,row.retry_at,row.created_at+settleMs);
+    const eligible=rows.filter(row=>row.created_at>=now-(row.trigger==='raid'?2*3600000:30*60000));
+    const time=row=>Math.max(global,row.not_before,row.retry_at,row.created_at+settleMs,this.targetNext(account,row.login));
     const ready=eligible.find(row=>time(row)<=now);
-    const first=ready||eligible.reduce((best,row)=>!best||time(row)<time(best)?row:best,null);
+    const first=eligible.find(row=>row.trigger==='raid')||ready||eligible.reduce((best,row)=>!best||time(row)<time(best)?row:best,null);
     return {count:rows.length,login:first?.login||'',sending:false,nextAt:first?time(first):0};
   }
   take(account,settleMs=0) {
     if (this.globalNext(account)>this.now()) return null;
-    this.db.prepare("UPDATE attempts SET status='cancelled',detail='Сообщение устарело' WHERE status='queued' AND created_at<?").run(this.now()-30*60000);
-    const row=this.db.prepare("SELECT * FROM attempts WHERE account=? AND status='queued' AND retry_at<=? AND not_before<=? AND created_at<=? ORDER BY created_at,rowid LIMIT 1").get(account,this.now(),this.now(),this.now()-settleMs);
+    this.db.prepare("UPDATE attempts SET status='cancelled',detail='Событие устарело' WHERE status='queued' AND ((trigger='raid' AND created_at<?) OR (trigger!='raid' AND created_at<?))").run(this.now()-2*3600000,this.now()-30*60000);
+    const raid=this.db.prepare("SELECT * FROM attempts WHERE account=? AND status='queued' AND trigger='raid' ORDER BY created_at,rowid LIMIT 1").get(account);
+    const row=raid||this.db.prepare("SELECT * FROM attempts WHERE account=? AND status='queued' AND retry_at<=? AND not_before<=? AND created_at<=? ORDER BY created_at,rowid LIMIT 1").get(account,this.now(),this.now(),this.now()-settleMs);
     if (!row) return null;
-    if (this.nextAt(account,row.login)>this.now()) {
+    if(Math.max(row.retry_at,row.not_before,row.created_at+settleMs,this.targetNext(account,row.login))>this.now())return null;
+    if (row.trigger!=='raid'&&this.nextAt(account,row.login)>this.now()) {
       this.finish(row.id,'cancelled','Действует таймаут'); return null;
     }
     this.db.prepare("UPDATE attempts SET status='sending',started_at=?,tries=tries+1 WHERE id=?").run(this.now(),row.id);
@@ -202,7 +232,7 @@ class Store {
     const row=this.db.prepare('SELECT * FROM attempts WHERE id=?').get(id);
     if (!row) return;
     // A rejected HTTP response is definitive; a transport timeout must not use this path.
-    this.db.prepare("UPDATE attempts SET status=?,retry_at=?,detail=? WHERE id=?").run(row.tries<3?'queued':'failed',this.now()+delay,detail,id);
+    this.db.prepare("UPDATE attempts SET status=?,retry_at=?,detail=? WHERE id=?").run(row.tries<(row.trigger==='raid'?60:3)?'queued':'failed',this.now()+delay,detail,id);
   }
   cancelQueue(detail='Ожидаем новое сообщение') {
     this.db.prepare("UPDATE attempts SET status='cancelled',detail=? WHERE status='queued'").run(detail);

@@ -1,12 +1,14 @@
 {
   "name": "shoutout-desk-obs",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Local Twitch auto-shoutouts in an OBS Studio dock",
   "license": "GPL-2.0-or-later",
   "author": "FermionaPlay",
   "repository": "github:foolka/shoutout-desk-obs",
-  "engines": { "node": ">=24.14.0 <25" },
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
   "scripts": {
     "build": "node tools/build.cjs",
     "test": "node --test tests/*.test.cjs",
@@ -19,5 +21,8 @@
     "@twurple/auth": "8.2.0",
     "@twurple/eventsub-ws": "8.2.0"
   },
-  "devDependencies": { "lucide-static": "0.468.0" }
+  "devDependencies": {
+    "lucide-static": "0.468.0",
+    "playwright": "1.58.2"
+  }
 }

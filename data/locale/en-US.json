@@ -25,7 +25,7 @@
   "openSettings": "Open settings",
   "later": "Later",
   "raidShoutouts": "Automatic raid shoutouts",
-  "raidHelp": "Waits 20 seconds after a raid, including streamers outside your list. An observed Twitch shoutout from another bot cancels the duplicate. Cooldowns and Twitch limits still apply.",
+  "raidHelp": "Raiders take priority, even after an earlier shoutout. Our personal timeout is bypassed; Twitch limits of 2 and 60 minutes remain. Waits at least 20 seconds; another bot shouting out this raid cancels the duplicate.",
   "autoUpdates": "Notify about new versions",
   "updateBanner": "Update %1: open",
   "raid": "Raid",

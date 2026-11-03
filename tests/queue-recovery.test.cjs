@@ -56,8 +56,11 @@ test('cancelled rate-limit retries do not delay unrelated people',t=>{
 });
 test('queue countdown reflects settling, raid and global waits',t=>{
   const f=fixture(t);f.store.setPrefs({raidShoutouts:true});f.store.enqueue('owner','first','raid');f.store.enqueue('owner','second');
-  assert.equal(f.store.queueState('owner').login,'second');assert.equal(f.store.queueState('owner').nextAt,f.store.now()+CHAT_SETTLE_MS);
-  f.advance(CHAT_SETTLE_MS);const row=f.store.take('owner',CHAT_SETTLE_MS);assert.equal(row.login,'second');
+  assert.equal(f.store.queueState('owner').login,'first');assert.equal(f.store.queueState('owner').nextAt,f.store.now()+20000);
+  f.advance(CHAT_SETTLE_MS);assert.equal(f.store.take('owner',CHAT_SETTLE_MS),null);
+  assert.equal(f.store.queueState('owner').login,'first');assert.equal(f.store.queueState('owner').nextAt,f.store.now()+10000);
+  f.advance(10000);const row=f.store.take('owner',CHAT_SETTLE_MS);assert.equal(row.login,'first');
   assert.equal(f.store.queueState('owner').sending,true);f.store.finish(row.id,'sent');
-  assert.equal(f.store.queueState('owner').login,'first');assert.equal(f.store.queueState('owner').nextAt,f.store.now()+125000);
+  assert.equal(f.store.queueState('owner').login,'second');assert.equal(f.store.queueState('owner').nextAt,f.store.now()+125000);
+  f.advance(125000);assert.equal(f.store.take('owner',CHAT_SETTLE_MS).login,'second');
 });

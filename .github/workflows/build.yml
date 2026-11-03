@@ -20,6 +20,12 @@ jobs:
       - run: npm run audit:source
       - run: npm run build
       - run: npm test
+      - name: Check six badge designs, customization and source reconnect
+        run: |
+          node tools/test-badge-designs.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node tools/test-badge-customization.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: npm run package
       - name: Install pinned Inno Setup compiler
         shell: pwsh

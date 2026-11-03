@@ -79,6 +79,8 @@ class Engine {
     if(result.status==='sent') {const stamp=Number(result.sentAt)||this.store.now();this.store.finish(row.id,'sent','',stamp);this.announce({account:row.account,login:row.login,stamp,profile:result.profile});}
     else if(result.status==='deferred') this.store.defer(row.id,result.detail);
     else if(result.status==='offline') { this.store.finish(row.id,'cancelled','Канал не в эфире'); this.live=false;this.store.cancelQueue('Канал не в эфире'); }
+    else if(result.status==='cancelled'&&this.store.raidAhead(row)&&this.store.canSend(row.id)) this.store.deferForRaid(row.id);
+    else if(['cancelled','rate_limited'].includes(result.status)&&this.store.waitForTarget(row)) { /* A delayed event revealed an earlier Twitch cooldown. */ }
     else if(result.status==='cancelled'||(result.status==='rate_limited'&&!this.store.canSend(row.id))) this.store.finish(row.id,'cancelled',result.detail||'Шотаут уже сделан в канале или очередь отменена');
     else if(result.status==='rate_limited') this.store.retry(row.id,125000,'Лимит Twitch: повтор через 2 минуты');
     else if(result.status==='failed') this.store.finish(row.id,'failed',result.detail || 'Twitch отклонил шотаут');
@@ -89,7 +91,7 @@ class Engine {
     const row=this.store.take(this.account,CHAT_SETTLE_MS); if(!row) return;
     this.busy=true;this.onChange();
     try {
-      const canSend=()=>!this.stopped&&this.ready&&this.live&&this.account===row.account&&this.store.canSend(row.id);
+      const canSend=()=>!this.stopped&&this.ready&&this.live&&this.account===row.account&&this.store.canSend(row.id)&&!this.store.raidAhead(row);
       const result=await this.bridge.call('send',{operationId:row.id,login:row.login,account:this.account,canSend});
       if(this.stopped)return;
       this.apply(row,result);

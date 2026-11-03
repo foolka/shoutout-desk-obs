@@ -41,7 +41,7 @@ class DirectBridge extends EventEmitter {
       });
       shoutout=listener.onChannelShoutoutCreate(this.target.id,this.actor,event=>{
         if(this.closed||epoch!==this.epoch||event.broadcasterId!==this.target.id)return;
-        this.store.observeShoutout(this.target.id,event.shoutedOutBroadcasterName,event.startDate.getTime());this.emit('changed');
+        this.store.observeShoutout(this.target.id,event.shoutedOutBroadcasterName,event.startDate.getTime(),{global:event.cooldownEndDate?.getTime(),target:event.targetCooldownEndDate?.getTime()});this.emit('changed');
         this.emit('badgeShoutout',{account:this.target.id,login:event.shoutedOutBroadcasterName,stamp:event.startDate.getTime()});
       });
       raid=listener.onChannelRaidTo(this.target.id,event=>{

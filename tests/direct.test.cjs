@@ -124,7 +124,8 @@ test('direct connection waits for all three subscriptions and refuses another br
 test('direct subscription forwards chat and records observed shoutouts without posting',async t=>{
   const f=directFixture(t);await f.ready();let chat;f.bridge.on('event',(_type,data)=>chat=data);
   f.listener.chat({chatterId:'u',chatterName:'viewer',broadcasterId:'actor',sourceBroadcasterId:'guest'});assert.equal(chat.user.login,'viewer');assert.equal(chat.sharedChatSource.id,'guest');
-  f.listener.shout({broadcasterId:'actor',shoutedOutBroadcasterName:'viewer',startDate:new Date(1800000000000)});assert.deepEqual(f.observed,[['actor','viewer',1800000000000]]);assert.equal(f.requests.length,0);
+  f.listener.shout({broadcasterId:'actor',shoutedOutBroadcasterName:'viewer',startDate:new Date(1800000000000),cooldownEndDate:new Date(1800000120000),targetCooldownEndDate:new Date(1800003600000)});
+  assert.deepEqual(f.observed,[['actor','viewer',1800000000000,{global:1800000120000,target:1800003600000}]]);assert.equal(f.requests.length,0);
 });
 test('incoming raids forward only for the current broadcaster and live connection',async t=>{
   const f=directFixture(t);await f.ready();const events=[];f.bridge.on('event',(...args)=>events.push(args));

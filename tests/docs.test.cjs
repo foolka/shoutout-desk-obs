@@ -5,7 +5,7 @@ test('README screenshots use the matching language and exist',()=>{
     const text=fs.readFileSync(path.join(root,file),'utf8');
     const images=[...text.matchAll(/!\[[^\]]*\]\((docs\/screenshots\/[^)]+)\)/g)];
     assert.ok(images.length>=8,file+' must show the main views, badge designs and editor');
-    for(const design of ['air','pass','sticker','editor'])assert.ok(images.some(([,image])=>image.endsWith('/badge-'+design+'.png')),file+': missing badge '+design);
+    for(const design of ['air','pass','sticker','terminal','ticket','frame','editor'])assert.ok(images.some(([,image])=>image.endsWith('/badge-'+design+'.png')),file+': missing badge '+design);
     for(const [,image] of images){assert.ok(image.startsWith('docs/screenshots/'+locale+'/'),file+': '+image);assert.ok(fs.existsSync(path.join(root,image)),image);}
   }
 });

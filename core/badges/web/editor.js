@@ -14,16 +14,33 @@ function field(group,key,text,type,options=[]){
   if(type==='select'){for(const [value,caption]of options){const option=document.createElement('option');option.value=value;option.textContent=caption;input.append(option);}const wrap=document.createElement('span');wrap.className='select-wrap';const icon=document.createElement('i');icon.dataset.lucide='chevron-down';wrap.append(input,icon);label.append(wrap);}
   else if(type==='checkbox'){input.type=type;label.textContent='';label.className='toggle';const caption=document.createElement('span');caption.textContent=text;label.append(input,caption);}
   else{input.type=type;label.append(input);}
-  $(group).append(label);input.oninput=()=>{if(!draft)return;const target=isPaletteKey(key)?draft.style.palettes[draft.style.design]:draft.style;target[key]=type==='checkbox'?input.checked:type==='number'?Number(input.value)/fieldScale(key):input.value;if(key==='stampEnabled')syncStamp();mark();preview();};return input;
+  $(group).append(label);input.oninput=()=>{if(!draft)return;if(type==='number'&&(input.value===''||!input.validity.valid))return;const target=isPaletteKey(key)?draft.style.palettes[draft.style.design]:draft.style;target[key]=type==='checkbox'?input.checked:type==='number'?Number(input.value)/fieldScale(key):input.value;if(key==='stampEnabled')syncStamp();mark();preview();};return input;
 }
 function fieldScale(key){return key==='descriptionSize'?1.5:1;}
 function isPaletteKey(key){return !!state?.paletteDefaults?.air&&Object.hasOwn(state.paletteDefaults.air,key);}
 function syncStamp(){$('stamp-options').disabled=!activeStyle().stampEnabled;}
-function fillStyle(){const theme=activeStyle();for(const input of document.querySelectorAll('[data-key]')){const key=input.dataset.key,value=isPaletteKey(key)?theme.palettes[theme.design][key]:theme[key];if(input.type==='checkbox')input.checked=value;else input.value=typeof value==='number'?value*fieldScale(key):value;}for(const button of $('designs').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.design===theme.design));$('palette-heading').textContent='Цвета: '+state.designs.find(item=>item.id===theme.design).name;$('f-accentTextColor').closest('label').hidden=theme.design==='sticker';$('f-surfaceColor').closest('label').firstChild.textContent=theme.design==='sticker'?'Плашка адреса':'Панель описания';syncStamp();}
+function fillStyle(){const theme=activeStyle();for(const input of document.querySelectorAll('[data-key]')){const key=input.dataset.key,value=isPaletteKey(key)?theme.palettes[theme.design][key]:theme[key];if(input.type==='checkbox')input.checked=value;else input.value=typeof value==='number'?value*fieldScale(key):value;}for(const button of $('designs').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.design===theme.design));$('palette-heading').textContent='Цвета: '+state.designs.find(item=>item.id===theme.design).name;$('f-accentTextColor').closest('label').hidden=theme.design==='sticker';$('f-surfaceColor').closest('label').hidden=theme.design==='sticker';syncStamp();}
 field('stamp-switch','stampEnabled','Показывать штамп','checkbox');
 const stampText=field('stamp-fields','stampText','Текст','text');stampText.maxLength=32;stampText.spellcheck=false;
 field('stamp-fields','stampPosition','Позиция','select',[['top-right','Справа сверху'],['top-left','Слева сверху'],['bottom-right','Справа снизу'],['bottom-left','Слева снизу']]);
 field('stamp-fields','stampColor','Цвет штампа','color');
+numeric.push(
+  ['sizes','width','Ширина бейджика, px',320,460],
+  ['sizes','avatarBorderScale','Рамка аватара, %',0,200],
+  ['sizes','shadowOffset','Смещение тени, px',0,16],
+  ['sizes','shadowBlur','Размытие тени, px',0,24],
+  ['typography','backgroundOpacity','Непрозрачность фона, %',0,100],
+  ['typography','shadowOpacity','Непрозрачность тени, %',0,100],
+  ['typography','fontWeight','Жирность ника',400,900],
+  ['typography','descriptionWeight','Жирность описания',400,900],
+  ['stamp-fields','stampOffsetX','Сдвиг X, px',-60,60],
+  ['stamp-fields','stampOffsetY','Сдвиг Y, px',-60,60],
+  ['stamp-fields','stampOpacity','Непрозрачность штампа, %',0,100]
+);
+field('sizes','borderStyle','Стиль рамки','select',[['solid','Сплошная'],['dashed','Штрихи'],['dotted','Точки'],['double','Двойная']]);
+field('sizes','avatarShape','Форма аватара','select',[['theme','По оформлению'],['circle','Круг'],['rounded','Скруглённый'],['square','Квадрат']]);
+for(const [key,label] of [['showHeader','Верхняя подпись'],['showHandle','Адрес канала'],['showFooter','Нижняя подпись']])field('typography',key,label,'checkbox');
+for(const [key,label] of [['headerText','Текст сверху'],['footerText','Текст снизу']]){const input=field('typography',key,label,'text');input.maxLength=48;input.placeholder='По оформлению';}
 for(const [group,key,text,min,max]of numeric){const input=field(group,key,text,'number');input.min=min*fieldScale(key);input.max=max*fieldScale(key);input.step=fieldScale(key);}
 function mark(){dirty=true;$('save-status').textContent='Есть изменения';}
 function activeStyle(){return selected&&!draft.custom?state.config.style:draft.style;}
@@ -70,5 +87,23 @@ $('reset').onclick=()=>{draft.style.palettes[draft.style.design]=structuredClone
 $('global-enabled').onchange=async()=>{const input=$('global-enabled');input.disabled=true;try{const next=await api('config',{account:state.account,enabled:input.checked,style:state.config.style});state=next;notice(input.checked?'Показ включён':'Показ выключен');}catch(error){input.checked=state.config.enabled;notice(error.message,true);}finally{input.disabled=false;}};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('source-url').value);notice('URL скопирован');}catch{$('source-url').select();document.execCommand('copy');notice('URL выбран для копирования');}};
 window.addEventListener('beforeunload',event=>{if(dirty){event.preventDefault();event.returnValue='';}});
-async function init(){state=await api('config');for(const [key,label]of state.paletteFields)field('colors',key,label,'color');for(const design of state.designs){const button=document.createElement('button');button.type='button';button.dataset.design=design.id;button.setAttribute('aria-pressed','false');const icon=document.createElement('i');icon.dataset.lucide={air:'radio',pass:'contact-round',sticker:'sticker'}[design.id];const name=document.createElement('span');name.textContent=design.name;button.append(icon,name);button.onclick=()=>{draft.style.design=design.id;fillStyle();mark();preview();};$('designs').append(button);}field('typography','font','Шрифт','select',state.fonts.map(f=>[f,f]));field('motion','effect','Появление','select',state.effects.map(e=>[e,effectNames[e]]));field('motion','exitEffect','Уход','select',state.exitEffects.map(e=>[e,exitNames[e]]));$('source-url').value=state.url;$('source-size').textContent=BadgeView.dimensions.width+' × '+BadgeView.dimensions.height;$('global-enabled').checked=state.config.enabled;select(selected,true);icons();}
+// Build controls from the server's supported designs and palettes.
+async function init(){
+  state=await api('config');
+  for(const [key,label]of state.paletteFields)field('colors',key,label,'color');
+  for(const design of state.designs){
+    const button=document.createElement('button');button.type='button';button.className='design-option';
+    button.dataset.design=design.id;button.setAttribute('aria-pressed','false');
+    const icon=document.createElement('i');
+    icon.dataset.lucide={air:'radio',pass:'contact-round',sticker:'sticker',terminal:'terminal',ticket:'ticket',frame:'image'}[design.id];
+    const name=document.createElement('span');name.textContent=design.name;button.append(icon,name);
+    button.onclick=()=>{draft.style.design=design.id;fillStyle();mark();preview();};
+    $('designs').append(button);
+  }
+  field('typography','font','Шрифт','select',state.fonts.map(f=>[f,f]));
+  field('motion','effect','Появление','select',state.effects.map(e=>[e,effectNames[e]]));
+  field('motion','exitEffect','Уход','select',state.exitEffects.map(e=>[e,exitNames[e]]));
+  $('source-url').value=state.url;$('source-size').textContent=BadgeView.dimensions.width+' × '+BadgeView.dimensions.height;
+  $('global-enabled').checked=state.config.enabled;select(selected,true);icons();
+}
 init().catch(error=>{$('save').disabled=true;$('global-enabled').disabled=true;notice(error.message,true);});

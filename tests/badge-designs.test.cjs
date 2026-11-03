@@ -5,8 +5,8 @@ const {Badges}=require('../core/badges/service.cjs');
 const {DESIGNS,PALETTES,DEFAULT_STYLE,style}=require('../core/badges/config.cjs');
 function fixture(t){const store=new Store(':memory:');store.rememberAccount('123','owner');store.add('alice');store.add('bob');const service=new Badges({store,account:()=> '123',port:0});t.after(()=>{service.close();store.close();});return {store,service};}
 
-test('exactly three designs have independent complete validated palettes',()=>{
-  assert.deepEqual(DESIGNS.map(d=>d.id),['air','pass','sticker']);
+test('six designs have independent complete validated palettes',()=>{
+  assert.deepEqual(DESIGNS.map(d=>d.id),['air','pass','sticker','terminal','ticket','frame']);
   const first=style(),second=style();
   first.palettes.air.background1='#123456';
   assert.equal(second.palettes.air.background1,PALETTES.air.background1);

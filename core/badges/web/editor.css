@@ -8,3 +8,18 @@
 @media(max-width:380px){.design-picker button{flex-direction:column;gap:5px}}
 #preview{height:440px}
 @media(max-width:540px){#preview{height:340px}}
+
+.design-option:hover {
+	background: #e8eeeb;
+}
+
+.design-option:active {
+	background: #c9dfd3;
+	outline: 2px solid #398f79;
+	outline-offset: 1px;
+}
+
+.design-option:focus-visible {
+	outline: 2px solid #398f79;
+	outline-offset: 2px;
+}
