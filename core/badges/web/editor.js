@@ -1,4 +1,5 @@
 const $=id=>document.getElementById(id),view=new BadgeView($('preview'));
+const customView=new BadgeView($('custom-preview'));
 const fragment=new URLSearchParams(location.hash.slice(1));
 const token=fragment.get('key')||sessionStorage.getItem('badge-key')||'';sessionStorage.setItem('badge-key',token);
 let selected=fragment.get('login')||'',state,draft,dirty=false,identity=null,profileEpoch=0,toastTimer,saving=false;
@@ -19,7 +20,22 @@ function field(group,key,text,type,options=[]){
 function fieldScale(key){return key==='descriptionSize'?1.5:1;}
 function isPaletteKey(key){return !!state?.paletteDefaults?.air&&Object.hasOwn(state.paletteDefaults.air,key);}
 function syncStamp(){$('stamp-options').disabled=!activeStyle().stampEnabled;}
-function fillStyle(){const theme=activeStyle();for(const input of document.querySelectorAll('[data-key]')){const key=input.dataset.key,value=isPaletteKey(key)?theme.palettes[theme.design][key]:theme[key];if(input.type==='checkbox')input.checked=value;else input.value=typeof value==='number'?value*fieldScale(key):value;}for(const button of $('designs').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.design===theme.design));$('palette-heading').textContent='Цвета: '+state.designs.find(item=>item.id===theme.design).name;$('f-accentTextColor').closest('label').hidden=theme.design==='sticker';$('f-surfaceColor').closest('label').hidden=theme.design==='sticker';syncStamp();}
+function fillStyle(){
+	const theme=activeStyle(),custom=theme.design==='custom';
+	for(const input of document.querySelectorAll('[data-key]')){
+		const key=input.dataset.key,value=isPaletteKey(key)?(theme.palettes[theme.design]||theme.palettes.air)[key]:theme[key];
+		if(input.type==='checkbox')input.checked=value;else input.value=typeof value==='number'?value*fieldScale(key):value;
+	}
+	for(const button of $('designs').querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.design===theme.design));
+	$('palette-heading').textContent='Цвета: '+state.designs.find(item=>item.id===theme.design).name;
+	$('f-accentTextColor').closest('label').hidden=theme.design==='sticker';$('f-surfaceColor').closest('label').hidden=theme.design==='sticker';
+	for(const group of document.querySelectorAll('[data-builtin]'))group.hidden=custom;
+	$('custom-editor').hidden=!custom;$('reset').hidden=custom;$('preview').hidden=custom;
+	document.querySelector('.preview-heading').hidden=custom;
+	document.querySelector('main').classList.toggle('badge-editor--custom',custom);
+	$('custom-html').value=theme.customHtml;$('custom-css').value=theme.customCss;
+	customStatus();syncStamp();
+}
 field('stamp-switch','stampEnabled','Показывать штамп','checkbox');
 const stampText=field('stamp-fields','stampText','Текст','text');stampText.maxLength=32;stampText.spellcheck=false;
 field('stamp-fields','stampPosition','Позиция','select',[['top-right','Справа сверху'],['top-left','Слева сверху'],['bottom-right','Справа снизу'],['bottom-left','Слева снизу']]);
@@ -44,7 +60,7 @@ for(const [key,label] of [['headerText','Текст сверху'],['footerText'
 for(const [group,key,text,min,max]of numeric){const input=field(group,key,text,'number');input.min=min*fieldScale(key);input.max=max*fieldScale(key);input.step=fieldScale(key);}
 function mark(){dirty=true;$('save-status').textContent='Есть изменения';}
 function activeStyle(){return selected&&!draft.custom?state.config.style:draft.style;}
-function preview(play=false){if(!draft)return;const login=selected||state.people[0]?.login||'streamer';const data={login,name:identity?.name||login,avatar:identity?.avatar||'',description:selected?draft.description:'Короткое описание стримера',style:activeStyle()};play?view.play(data,play==='exit'?650+data.style.duration*1000:0):view.render(data);}
+function preview(play=false){if(!draft)return;const login=selected||state.people[0]?.login||'streamer';const data={login,name:identity?.name||login,avatar:identity?.avatar||'',description:selected?draft.description:'Короткое описание стримера',style:activeStyle()};const custom=data.style.design==='custom',target=custom?customView:view;(custom?view:customView).hide();play?target.play(data,play==='exit'?650+data.style.duration*1000:0):target.render(data);}
 async function loadIdentity(){const epoch=++profileEpoch;identity=null;preview();const login=selected||state.people[0]?.login;if(!login)return;try{const data=await api('profile?login='+encodeURIComponent(login));if(epoch===profileEpoch){identity=data;preview();}}catch{} }
 function people(){
   $('people').replaceChildren();const q=$('search').value.trim().toLowerCase();$('count').textContent=state.people.length;let shown=0;
@@ -95,7 +111,7 @@ async function init(){
     const button=document.createElement('button');button.type='button';button.className='design-option';
     button.dataset.design=design.id;button.setAttribute('aria-pressed','false');
     const icon=document.createElement('i');
-    icon.dataset.lucide={air:'radio',pass:'contact-round',sticker:'sticker',terminal:'terminal',ticket:'ticket',frame:'image'}[design.id];
+    icon.dataset.lucide={air:'radio',pass:'contact-round',sticker:'sticker',terminal:'terminal',ticket:'ticket',frame:'image',custom:'code-2'}[design.id];
     const name=document.createElement('span');name.textContent=design.name;button.append(icon,name);
     button.onclick=()=>{draft.style.design=design.id;fillStyle();mark();preview();};
     $('designs').append(button);
@@ -107,3 +123,45 @@ async function init(){
   $('global-enabled').checked=state.config.enabled;select(selected,true);icons();
 }
 init().catch(error=>{$('save').disabled=true;$('global-enabled').disabled=true;notice(error.message,true);});
+
+// Keep code editing local until the existing explicit save action is used.
+function customStatus(){
+	const text=$('custom-html').value,css=$('custom-css').value;
+	const known=new Set(BadgeTemplate.variables.map(([key])=>key));
+	const unknown=[...text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g)].map(match=>match[1]).filter(key=>!known.has(key));
+	$('custom-status').textContent=unknown.length?'Неизвестные переменные: '+[...new Set(unknown)].map(key=>'{{'+key+'}}').join(', '):`HTML ${text.length} / 32768 · CSS ${css.length} / 32768`;
+}
+
+// Update the exact same renderer used by the OBS browser source.
+function editCustom(){
+	if(!draft||$('theme-controls').disabled)return;
+	draft.style.customHtml=$('custom-html').value;draft.style.customCss=$('custom-css').value;
+	customStatus();mark();preview();
+}
+
+// Copy with a visible fallback when clipboard permission is unavailable.
+async function copyCustom(text){
+	try{await navigator.clipboard.writeText(text);notice('Скопировано');}
+	catch{$('custom-prompt').focus();$('custom-prompt').select();notice('Автокопирование недоступно. Выдели нужный текст и нажми Ctrl+C.');}
+}
+
+for(const [key,title,help] of BadgeTemplate.variables){
+	const item=document.createElement('li');item.className='b-custom-editor__variable';
+	const copy=document.createElement('div');copy.className='b-custom-editor__variable-copy';copy.textContent=title;
+	const code=document.createElement('code');code.className='b-custom-editor__token';code.textContent='{{'+key+'}}';
+	const description=document.createElement('div');description.className='b-custom-editor__hint';description.textContent=help;
+	copy.append(code,description);
+	const button=document.createElement('button');button.type='button';button.className='icon-button b-custom-editor__action';button.title='Скопировать '+code.textContent;button.setAttribute('aria-label',button.title);
+	const icon=document.createElement('i');icon.dataset.lucide='copy';button.append(icon);button.onclick=()=>void copyCustom(code.textContent);
+	item.append(copy,button);$('custom-variables').append(item);
+}
+for(const id of ['custom-html','custom-css'])$(id).addEventListener('input',editCustom);
+$('custom-animate').onclick=()=>preview(true);
+$('custom-example').onclick=()=>{
+	if(!confirm('Заменить текущие HTML и CSS готовым примером? Изменения сохранятся только после нажатия «Сохранить».'))return;
+	$('custom-html').value=BadgeTemplate.html;$('custom-css').value=BadgeTemplate.css;editCustom();
+};
+$('custom-brief').oninput=()=>{$('custom-prompt').value=BadgeTemplate.prompt($('custom-brief').value);};
+$('custom-prompt').value=BadgeTemplate.prompt();
+$('custom-copy-prompt').onclick=()=>void copyCustom($('custom-prompt').value);
+for(const button of $('custom-editor').querySelectorAll('button'))button.classList.add('b-custom-editor__action');

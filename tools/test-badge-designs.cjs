@@ -19,14 +19,14 @@ let browser;
   await page.setViewportSize({width:1280,height:1000});await page.goto(service.editor('sayrek_liss'));
   await page.waitForFunction(()=>document.querySelector('#description').value.length>0);
   assert.equal(await page.locator('#description').inputValue(),description);assert(await page.locator('[data-design=air]').last().count());
-  assert.equal(await page.locator('#designs button').count(),6);assert(await page.locator('#designs button').first().isDisabled());
+  assert.equal(await page.locator('#designs button').count(),7);assert(await page.locator('#designs button').first().isDisabled());
   await page.locator('#default-theme').click();
   const chosen={air:'#ffbb88',pass:'#3b254a',sticker:'#bdd8ef',terminal:'#153a2b',ticket:'#ffdde5',frame:'#e7f0fb'};
-  for(const design of DESIGNS){await page.locator('#designs [data-design='+design.id+']').click();await page.locator('#f-background1').fill(chosen[design.id]);await page.locator('#f-stampColor').fill('#9b3f63');}
-  for(const design of DESIGNS){await page.locator('#designs [data-design='+design.id+']').click();assert.equal(await page.locator('#f-background1').inputValue(),chosen[design.id]);}
+  for(const design of DESIGNS.filter(d=>d.id!=='custom')){await page.locator('#designs [data-design='+design.id+']').click();await page.locator('#f-background1').fill(chosen[design.id]);await page.locator('#f-stampColor').fill('#9b3f63');}
+  for(const design of DESIGNS.filter(d=>d.id!=='custom')){await page.locator('#designs [data-design='+design.id+']').click();assert.equal(await page.locator('#f-background1').inputValue(),chosen[design.id]);}
   await page.locator('#designs [data-design=sticker]').click();
   await page.locator('#save').click();await page.waitForFunction(()=>document.querySelector('#save-status').textContent==='Сохранено');
-  assert.equal(service.config().style.design,'sticker');for(const design of DESIGNS)assert.equal(service.config().style.palettes[design.id].background1,chosen[design.id]);
+  assert.equal(service.config().style.design,'sticker');for(const design of DESIGNS.filter(d=>d.id!=='custom'))assert.equal(service.config().style.palettes[design.id].background1,chosen[design.id]);
   await page.reload();await page.locator('#designs [aria-pressed=true]').waitFor();assert.equal(await page.locator('#f-background1').inputValue(),chosen.sticker);
   await page.locator('#reset').click();assert.equal(await page.locator('#f-background1').inputValue(),PALETTES.sticker.background1);
   await page.locator('#designs [data-design=air]').click();assert.equal(await page.locator('#f-background1').inputValue(),chosen.air);
@@ -42,7 +42,7 @@ let browser;
   service.current=null;service.queue=[];
   await overlay.evaluate(()=>window.probe=new BadgeView(document.querySelector('.badge-stage')));
   let cases=0;
-  for(const design of DESIGNS){
+  for(const design of DESIGNS.filter(d=>d.id!=='custom')){
     for(const font of FONTS){
       for(const long of [false,true]){
         const settings=style({design:design.id,font,...(long?{paddingX:48,paddingY:32,radius:80,borderWidth:12,fontSize:48,descriptionSize:26,avatarSize:120,gap:36}:{})});

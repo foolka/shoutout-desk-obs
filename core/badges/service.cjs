@@ -1,8 +1,9 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
-const {randomBytes,randomUUID,timingSafeEqual}=require('node:crypto');
+const {randomBytes,randomUUID,timingSafeEqual,createHash}=require('node:crypto');
 const {normalizeLogin}=require('../store.cjs');
 const {DEFAULT_STYLE,DEFAULT_PERSON,EFFECTS,FONTS,DESIGNS,PALETTES,PALETTE_FIELDS,style,person}=require('./config.cjs');
 const WIDTH=560,HEIGHT=560;
+const PURIFY=require.resolve('dompurify/dist/purify.js');
 const same=(a,b)=>typeof a==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 function avatar(url){try{const u=new URL(url);return u.protocol==='https:'&&u.hostname==='static-cdn.jtvnw.net'&&!u.username&&!u.password?u.href:'';}catch{return '';}}
 class Badges {
@@ -12,6 +13,9 @@ class Badges {
     this.overlayToken=store.meta('badges:overlayToken','');
     if(!/^[a-f0-9]{64}$/.test(this.overlayToken)){this.overlayToken=randomBytes(32).toString('hex');store.setMeta('badges:overlayToken',this.overlayToken);}
     this.cache=new Map();this.queue=[];this.current=null;this.pending=Promise.resolve();this.closed=false;
+    const hash=createHash('sha256');
+    for(const file of ['overlay.html','overlay.js','render.js','custom-render.js','custom-template.js','badge.css','stamp-ink.png'])hash.update(fs.readFileSync(path.join(__dirname,'web',file)));
+    hash.update(fs.readFileSync(PURIFY));this.build=hash.digest('hex');this.compatibleSeen=-Infinity;
   }
   config(account=this.account()){
     const value=this.store.meta('badges:config:'+account,{});
@@ -65,9 +69,14 @@ class Badges {
     const now=this.now();
     if(this.current&&(now>=this.current.endsAt||!this.allowed(this.current)))this.current=null;
     if(!this.current){
-      let next;while((next=this.queue.shift())){if(!this.allowed(next)||now-next.queuedAt>120000)continue;this.current={...next,startsAt:now,endsAt:now+next.style.duration*1000+950};break;}
+      let next;while((next=this.queue[0])){
+        if(!this.allowed(next)||now-next.queuedAt>120000){this.queue.shift();continue;}
+        // A legacy source cannot render custom HTML; retain its event until a compatible page connects.
+        if(next.style.design==='custom'&&now-this.compatibleSeen>=12000)break;
+        this.queue.shift();this.current={...next,startsAt:now,endsAt:now+next.style.duration*1000+950};break;
+      }
     }
-    return {now,event:this.current};
+    return {now,event:this.current,build:this.build};
   }
   async start(){
     this.server=http.createServer((req,res)=>void this.handle(req,res).catch(()=>{if(!res.headersSent)this.json(res,500,{error:'Ошибка источника.'});else res.destroy();}));
@@ -79,14 +88,18 @@ class Badges {
     this.timer=setInterval(()=>this.frame(),200);this.timer.unref();return this.info();
   }
   json(res,status,value){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value));}
-  async body(req){let text='';for await(const part of req){text+=part;if(Buffer.byteLength(text)>32768)throw Error('Запрос слишком большой.');}return JSON.parse(text);}
+  async body(req){let size=0;const chunks=[];for await(const part of req){size+=part.length;if(size>524288)throw Error('Запрос слишком большой.');chunks.push(part);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
   async handle(req,res){
     res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
-    res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static-cdn.jtvnw.net; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'");
+    res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://static-cdn.jtvnw.net; connect-src 'self' https://static-cdn.jtvnw.net; object-src 'none'; base-uri 'none'; frame-ancestors 'self'");
     if(req.headers.host!==this.origin?.slice(7))return this.json(res,403,{error:'Неверный адрес.'});
     const url=new URL(req.url,this.origin),route=url.pathname;
     if(req.headers.origin&&req.headers.origin!==this.origin)return this.json(res,403,{error:'Чужой источник запроса.'});
-    if(route==='/api/view/'+this.overlayToken&&req.method==='GET')return this.json(res,200,this.frame());
+    if(route==='/api/view/'+this.overlayToken&&req.method==='GET'){
+      if(url.searchParams.get('build')===this.build)this.compatibleSeen=this.now();
+      else return this.json(res,200,{now:this.now(),event:this.current?.style.design==='custom'?null:this.current,build:this.build});
+      return this.json(res,200,this.frame());
+    }
     if(route.startsWith('/api/')){
       if(!same(req.headers.authorization,'Bearer '+this.adminToken))return this.json(res,401,{error:'Откройте «Бейджики» из приложения.'});
       try{
@@ -97,11 +110,13 @@ class Badges {
       }catch(error){return this.json(res,400,{error:error.message});}
       return this.json(res,404,{error:'Не найдено.'});
     }
-    const files={'/editor':'editor.html','/editor.js':'editor.js','/editor.css':'editor.css','/render.js':'render.js','/badge.css':'badge.css','/stamp-ink.png':'stamp-ink.png','/overlay.js':'overlay.js','/icons.js':'icons.js'};
+    if(route==='/purify.js'&&req.method==='GET'){res.writeHead(200,{'Content-Type':'text/javascript; charset=utf-8'});return res.end(fs.readFileSync(PURIFY));}
+    const files={'/editor':'editor.html','/editor.js':'editor.js','/editor.css':'editor.css','/custom-editor.css':'custom-editor.css','/custom-render.js':'custom-render.js','/custom-template.js':'custom-template.js','/render.js':'render.js','/badge.css':'badge.css','/stamp-ink.png':'stamp-ink.png','/overlay.js':'overlay.js','/icons.js':'icons.js'};
     if(route==='/overlay/'+this.overlayToken)files[route]='overlay.html';
     if(!files[route]||req.method!=='GET')return this.json(res,404,{error:'Не найдено.'});
     const file=files[route],type=file.endsWith('.png')?'image/png':file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':'text/javascript';
-    res.writeHead(200,{'Content-Type':type+'; charset=utf-8'});res.end(fs.readFileSync(path.join(__dirname,'web',file)));
+    res.writeHead(200,{'Content-Type':type+'; charset=utf-8'});
+    const bytes=fs.readFileSync(path.join(__dirname,'web',file));res.end(file==='overlay.html'?bytes.toString('utf8').replace('SHOUTOUT_BADGE_BUILD',this.build):bytes);
   }
   close(){this.closed=true;clearInterval(this.timer);this.queue=[];this.current=null;this.server?.closeAllConnections();this.server?.close();}
 }

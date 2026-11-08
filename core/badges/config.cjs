@@ -1,7 +1,8 @@
 const EFFECTS=['fade','left','right','up','down','zoom','pop','flip','tilt','blur'];
 const FONTS=['Segoe UI','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Impact','Courier New'];
 const STAMP_POSITIONS=['top-right','top-left','bottom-right','bottom-left'];
-const DESIGNS=[{id:'air',name:'Эфир'},{id:'pass',name:'Пропуск'},{id:'sticker',name:'Стикер'},{id:'terminal',name:'Терминал'},{id:'ticket',name:'Билет'},{id:'frame',name:'Портрет'}];
+const CUSTOM=require('./web/custom-template.js');
+const DESIGNS=[{id:'air',name:'Эфир'},{id:'pass',name:'Пропуск'},{id:'sticker',name:'Стикер'},{id:'terminal',name:'Терминал'},{id:'ticket',name:'Билет'},{id:'frame',name:'Портрет'},{id:'custom',name:'Свой HTML / CSS'}];
 const PALETTES={
   air:{background1:'#fcfcfb',background2:'#fcfcfb',surfaceColor:'#fcfcfb',borderColor:'#d7dcd8',accentColor:'#cf5046',accentTextColor:'#ffffff',textColor:'#252a29',descriptionColor:'#303931',mutedColor:'#647169',avatarBackground:'#77a998',avatarBorderColor:'#ffffff',shadowColor:'#b4c7bb',stampColor:'#c63d3a'},
   pass:{background1:'#262a27',background2:'#262a27',surfaceColor:'#30372c',borderColor:'#626b60',accentColor:'#d6ee9f',accentTextColor:'#252d1c',textColor:'#f4f7ef',descriptionColor:'#e0e7d6',mutedColor:'#b2be9f',avatarBackground:'#77a998',avatarBorderColor:'#879875',shadowColor:'#8ca875',stampColor:'#d6ee9f'},
@@ -12,7 +13,7 @@ const PALETTES={
 };
 const PALETTE_FIELDS=[['background1','Фон: начало'],['background2','Фон: конец'],['surfaceColor','Панель описания'],['borderColor','Рамка и разделители'],['accentColor','Акцент'],['accentTextColor','Текст на акценте'],['textColor','Ник'],['descriptionColor','Описание'],['mutedColor','Подписи'],['avatarBackground','Фон аватара'],['avatarBorderColor','Рамка аватара'],['shadowColor','Тень']];
 const DEFAULT_STYLE={design:'air',palettes:PALETTES,paddingX:28,paddingY:20,radius:8,borderWidth:1,borderColor:'#f5b85b',background1:'#386b63',background2:'#183c4d',angle:120,textColor:'#ffffff',descriptionColor:'#dfeee8',font:'Segoe UI',fontSize:32,descriptionSize:18,avatarSize:96,gap:20,effect:'pop',exitEffect:'fade',duration:8,stampEnabled:true,stampText:'СТРИМЕР',stampPosition:'top-right',stampAngle:-14,stampColor:'#ed3d4d',stampSize:136,stampFontSize:22,
-  width:420,backgroundOpacity:100,shadowOpacity:100,shadowBlur:0,shadowOffset:8,borderStyle:'solid',avatarShape:'theme',avatarBorderScale:100,fontWeight:750,descriptionWeight:400,showHeader:true,showHandle:true,showFooter:true,headerText:'',footerText:'',stampOffsetX:0,stampOffsetY:0,stampOpacity:100};
+  width:420,backgroundOpacity:100,shadowOpacity:100,shadowBlur:0,shadowOffset:8,borderStyle:'solid',avatarShape:'theme',avatarBorderScale:100,fontWeight:750,descriptionWeight:400,showHeader:true,showHandle:true,showFooter:true,headerText:'',footerText:'',stampOffsetX:0,stampOffsetY:0,stampOpacity:100,customHtml:CUSTOM.html,customCss:CUSTOM.css};
 const numbers={paddingX:[4,48],paddingY:[4,32],radius:[0,80],borderWidth:[0,12],angle:[0,360],fontSize:[16,48],descriptionSize:[12,26],avatarSize:[32,120],gap:[4,36],duration:[2,30],stampAngle:[-45,45],stampSize:[80,240],stampFontSize:[10,42],width:[320,460],backgroundOpacity:[0,100],shadowOpacity:[0,100],shadowBlur:[0,24],shadowOffset:[0,16],avatarBorderScale:[0,200],fontWeight:[400,900],descriptionWeight:[400,900],stampOffsetX:[-60,60],stampOffsetY:[-60,60],stampOpacity:[0,100]};
 function palettes(value={},base=PALETTES){
   if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Некорректные палитры.');
@@ -33,6 +34,7 @@ function style(value={},previous){
     if(!Object.hasOwn(result,key))throw Error('Неизвестный параметр оформления.');
     if(key==='palettes'){result.palettes=palettes(v,result.palettes);continue;}
     if(key==='design'){if(!DESIGNS.some(design=>design.id===v))throw Error('Неизвестный вариант бейджика.');}
+    else if(Object.hasOwn(CUSTOM.limits,key)){if(typeof v!=='string'||v.length>CUSTOM.limits[key]||v.includes('\0'))throw Error('HTML и CSS: до 32768 символов в каждом поле, без нулевых символов.');}
     else if(numbers[key]){const [min,max]=numbers[key];if(!Number.isInteger(v)||v<min||v>max)throw Error('Значение вне диапазона: '+key);}
     else if(['stampEnabled','showHeader','showHandle','showFooter'].includes(key)){if(typeof v!=='boolean')throw Error('Некорректный переключатель оформления.');}
     else if(key==='borderStyle'){if(!['solid','dashed','dotted','double'].includes(v))throw Error('Неизвестный стиль рамки.');}

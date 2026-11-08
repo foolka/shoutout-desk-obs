@@ -2,6 +2,29 @@
 html,body{margin:0}
 body.overlay{background:transparent;overflow:hidden;width:100vw;height:100vh}
 .badge-stage{position:relative;width:100%;height:100%;overflow:hidden}
+.shoutout-badge[data-design=custom] {
+	width: 560px;
+	height: 560px;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+}
+
+.shoutout-badge[data-design=custom] > :not(.badge-custom-frame) {
+	display: none;
+}
+
+.badge-custom-frame {
+	position: absolute;
+	inset: 0;
+	width: 560px;
+	height: 560px;
+	border: 0;
+	background: transparent;
+	pointer-events: none;
+}
 .badge-space{position:absolute;width:560px;height:560px;transform-origin:top left;display:flex;align-items:center;justify-content:center}
 .shoutout-badge {
 	position: relative;

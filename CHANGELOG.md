@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 - 2026-11-08
+
+- Add a seventh badge mode: custom HTML/CSS with a live preview, variable reference, starter template and copyable AI brief.
+- Support common and per-streamer templates, inline style blocks and optional empty-field hiding. Keep all six preset designs and their palettes.
+- Sanitize HTML with DOMPurify and render in a sandbox without scripts or same-origin access. External resources are blocked; validated Twitch avatars are embedded by the trusted renderer.
+- Add source-build checks. Keep custom badges queued until a compatible source connects and reload outdated version-aware pages before display.
+- Preserve the separate plugin profile, people, descriptions, source URL, history, cooldowns and authorization. No database migration.
+- Fully restart OBS after updating from 0.5.0 or older so its legacy browser page loads the new version-aware renderer.
+
 ## 0.5.0 - 2026-11-03
 
 - Give incoming raids priority over queued chat shoutouts, including when the guest message arrives first. Recheck priority before direct Twitch delivery.

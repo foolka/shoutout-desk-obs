@@ -1,6 +1,6 @@
 {
   "name": "shoutout-desk-obs",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Local Twitch auto-shoutouts in an OBS Studio dock",
   "license": "GPL-2.0-or-later",
@@ -12,6 +12,7 @@
   "scripts": {
     "build": "node tools/build.cjs",
     "test": "node --test tests/*.test.cjs",
+    "test:badge-custom": "node tools/test-badge-custom.cjs",
     "package": "node tools/package.cjs",
     "installer": "node tools/build-installer.cjs",
     "audit:source": "node tools/audit-source.cjs"
@@ -19,7 +20,8 @@
   "dependencies": {
     "@twurple/api": "8.2.0",
     "@twurple/auth": "8.2.0",
-    "@twurple/eventsub-ws": "8.2.0"
+    "@twurple/eventsub-ws": "8.2.0",
+    "dompurify": "3.4.17"
   },
   "devDependencies": {
     "lucide-static": "0.468.0",

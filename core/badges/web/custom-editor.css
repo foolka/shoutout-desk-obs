@@ -1,0 +1,131 @@
+.design-option[data-design=custom] {
+	grid-column: 1 / -1;
+}
+
+.badge-editor--custom {
+	max-width: 1440px;
+}
+
+.b-custom-editor {
+	display: grid;
+	grid-template-columns: minmax(180px, .8fr) minmax(0, 1.6fr);
+	gap: 20px;
+	padding: 16px 0;
+	border-top: 1px solid #d5dcd8;
+
+	@media screen and (max-width: 850px) {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.b-custom-editor__reference,
+.b-custom-editor__code {
+	min-width: 0;
+}
+
+.b-custom-editor__heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.b-custom-editor__title {
+	margin: 0;
+	font-size: 14px;
+}
+
+.b-custom-editor__preview {
+	height: auto;
+	aspect-ratio: 1;
+	border: 1px solid #ced8d1;
+	border-radius: 6px;
+	background: repeating-conic-gradient(#d6ded8 0% 25%, #e1e8e4 0% 50%) 0 / 20px 20px;
+}
+
+.b-custom-editor__variables {
+	display: grid;
+	gap: 10px;
+	margin: 12px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.b-custom-editor__variable {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #d5dcd8;
+}
+
+.b-custom-editor__variable-copy {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.b-custom-editor__token {
+	display: block;
+	margin: 4px 0;
+	font: 13px Consolas, monospace;
+	color: #285d4b;
+}
+
+.b-custom-editor__hint {
+	margin: 8px 0 14px;
+	font-size: 12px;
+	line-height: 1.5;
+	color: #546a60;
+	overflow-wrap: anywhere;
+}
+
+.b-custom-editor__label {
+	margin: 12px 0 6px;
+}
+
+.b-custom-editor__input {
+	display: block;
+	width: 100%;
+	min-height: 220px;
+	padding: 12px;
+	font: 13px/1.55 Consolas, monospace;
+	tab-size: 2;
+	white-space: pre;
+	overflow: auto;
+}
+
+.b-custom-editor__ai {
+	margin-top: 20px;
+	padding-top: 16px;
+	border-top: 1px solid #d5dcd8;
+}
+
+.b-custom-editor__summary {
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.b-custom-editor__brief {
+	margin-bottom: 8px;
+}
+
+.b-custom-editor__prompt {
+	display: block;
+	margin-top: 10px;
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.b-custom-editor__action:active,
+.b-custom-editor__summary:active {
+	outline: 2px solid #398f79;
+	outline-offset: 2px;
+}
+
+.b-custom-editor__summary:focus-visible {
+	outline: 2px solid #398f79;
+	outline-offset: 2px;
+}

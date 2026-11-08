@@ -26,7 +26,7 @@ let browser;
   assert.equal(saved.shadowOpacity,0);assert.equal(saved.showHandle,false);assert.equal(saved.headerText,'НАШ ГОСТЬ');
   const overlay=await context.newPage();await overlay.goto(service.info().url);
   await overlay.evaluate(()=>window.probe=new BadgeView(document.querySelector('.badge-stage')));
-  for(const design of DESIGNS){
+  for(const design of DESIGNS.filter(d=>d.id!=='custom')){
     const actual=await overlay.evaluate(data=>{
       window.probe.render(data);
       const card=document.querySelector('.shoutout-badge'),avatar=card.querySelector('.badge-avatar'),stamp=card.querySelector('.badge-stamp-slot');

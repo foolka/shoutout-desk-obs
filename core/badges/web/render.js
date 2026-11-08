@@ -35,14 +35,20 @@
       this.nameText=document.createElement('span');this.nameText.className='badge-name-text';this.name.append(this.nameText);
       this.footer=document.createElement('div');this.footer.className='badge-footer';this.footer.textContent='СВОИ ЛЮДИ';
       this.card.append(this.header,this.avatar,copy,this.footer);this.space.append(this.card);root.replaceChildren(this.space);
+      this.customFrame=document.createElement('iframe');this.customFrame.className='badge-custom-frame';this.customFrame.title='Свой бейджик';this.customFrame.setAttribute('sandbox','');this.customFrame.setAttribute('referrerpolicy','no-referrer');this.customFrame.setAttribute('aria-hidden','true');this.customFrame.tabIndex=-1;this.customFrame.hidden=true;this.card.append(this.customFrame);
       this.stampSlot=document.createElement('div');this.stampSlot.className='badge-stamp-slot';this.stamp=document.createElement('div');this.stamp.className='badge-stamp';this.stampText=document.createElement('span');this.stamp.append(this.stampText);this.stampSlot.append(this.stamp);this.card.append(this.stampSlot);
       this.observer=new ResizeObserver(()=>this.resize());this.observer.observe(root);
     }
     resize(){const {width,height}=BadgeView.dimensions,scale=Math.min(this.root.clientWidth/width,this.root.clientHeight/height);this.space.style.transform=`scale(${scale})`;this.space.style.left=(this.root.clientWidth-width*scale)/2+'px';this.space.style.top=(this.root.clientHeight-height*scale)/2+'px';}
     render(data){
       this.stop();const s={stampEnabled:true,stampText:'СТРИМЕР',stampPosition:'top-right',stampAngle:-14,stampColor:'#ed3d4d',stampSize:164,stampFontSize:24,width:420,backgroundOpacity:100,shadowOpacity:100,shadowBlur:0,shadowOffset:8,borderStyle:'solid',avatarShape:'theme',avatarBorderScale:100,fontWeight:750,descriptionWeight:400,showHeader:true,showHandle:true,showFooter:true,headerText:'',footerText:'',stampOffsetX:0,stampOffsetY:0,stampOpacity:100,...data.style};
-      const design=['air','pass','sticker','terminal','ticket','frame'].includes(s.design)?s.design:'air',p=s.palettes?.[design]||s;
+      const design=['air','pass','sticker','terminal','ticket','frame','custom'].includes(s.design)?s.design:'air',p=s.palettes?.[design]||s;
       this.card.dataset.design=design;
+      if(design==='custom'){
+        this.customFrame.hidden=false;CustomBadge.render(this.customFrame,{...data,style:s});
+        this.card.hidden=false;this.resize();return;
+      }
+      this.customFrame.hidden=true;this.customFrame.removeAttribute('srcdoc');
       const vars={'--px':s.paddingX+'px','--py':s.paddingY+'px','--radius':s.radius+'px','--border':s.borderWidth+'px','--border-color':p.borderColor,'--bg1':p.background1,'--bg2':p.background2,'--angle':s.angle+'deg','--color':p.textColor,'--description-color':p.descriptionColor,'--surface':p.surfaceColor||p.background1,'--accent':p.accentColor||s.borderColor,'--accent-text':p.accentTextColor||s.textColor,'--muted':p.mutedColor||s.descriptionColor,'--avatar-bg':p.avatarBackground||s.background1,'--avatar-border':p.avatarBorderColor||s.borderColor,'--shadow':p.shadowColor||s.borderColor,'--font':s.font,'--name-size':s.fontSize+'px','--description-size':(s.descriptionSize*1.5)+'px','--avatar':s.avatarSize+'px','--gap':s.gap+'px'};
       for(const [name,value]of Object.entries(vars))this.card.style.setProperty(name,value);
       const alpha=(color,opacity)=>color+Math.round(opacity*2.55).toString(16).padStart(2,'0');

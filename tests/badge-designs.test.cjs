@@ -6,12 +6,12 @@ const {DESIGNS,PALETTES,DEFAULT_STYLE,style}=require('../core/badges/config.cjs'
 function fixture(t){const store=new Store(':memory:');store.rememberAccount('123','owner');store.add('alice');store.add('bob');const service=new Badges({store,account:()=> '123',port:0});t.after(()=>{service.close();store.close();});return {store,service};}
 
 test('six designs have independent complete validated palettes',()=>{
-  assert.deepEqual(DESIGNS.map(d=>d.id),['air','pass','sticker','terminal','ticket','frame']);
+  assert.deepEqual(DESIGNS.map(d=>d.id),['air','pass','sticker','terminal','ticket','frame','custom']);
   const first=style(),second=style();
   first.palettes.air.background1='#123456';
   assert.equal(second.palettes.air.background1,PALETTES.air.background1);
   assert.equal(DEFAULT_STYLE.palettes.air.background1,PALETTES.air.background1);
-  for(const design of DESIGNS){assert.equal(style({design:design.id}).design,design.id);assert.deepEqual(Object.keys(PALETTES[design.id]),Object.keys(PALETTES.air));}
+  for(const design of DESIGNS.filter(d=>d.id!=='custom')){assert.equal(style({design:design.id}).design,design.id);assert.deepEqual(Object.keys(PALETTES[design.id]),Object.keys(PALETTES.air));}
 });
 
 test('invalid nested colors and prototype-like design keys are rejected',()=>{

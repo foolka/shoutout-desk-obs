@@ -1,5 +1,7 @@
 # Third-Party Notices
 
+- DOMPurify 3.4.17: Apache-2.0 OR MPL-2.0. Sanitizes custom badge HTML; packaged dependencies retain its license. https://github.com/cure53/DOMPurify
+
 Shoutout Desk OBS is Copyright (c) 2026 FermionaPlay contributors, licensed GPL-2.0-or-later. The queue/authentication implementation is adapted from the author's Shoutout Desk desktop application. No desktop profiles, credentials or private assets are included.
 
 - **OBS Studio**: GPL-2.0-or-later. The plugin calls the public OBS frontend C ABI. OBS binaries are not redistributed. https://github.com/obsproject/obs-studio

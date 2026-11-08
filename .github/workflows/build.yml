@@ -20,6 +20,7 @@ jobs:
       - run: npm run audit:source
       - run: npm run build
       - run: npm test
+      - run: npm run test:badge-custom
       - name: Check six badge designs, customization and source reconnect
         run: |
           node tools/test-badge-designs.cjs
