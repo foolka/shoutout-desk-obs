@@ -5,7 +5,8 @@ const {Engine}=require('../core/engine.cjs');
 const {DEFAULT_STYLE,style,person,EFFECTS}=require('../core/badges/config.cjs');
 function fixture(t){let now=1900000000000,account='123';const store=new Store(':memory:',()=>now);store.rememberAccount(account,'owner');store.add('alice');store.add('bob');
  const service=new Badges({store,account:()=>account,now:()=>now,port:0,profile:async login=>({displayName:login.toUpperCase(),avatarUrl:'https://static-cdn.jtvnw.net/avatars/'+login+'.png'})});
- t.after(()=>{service.close();store.close();});return {store,service,advance:ms=>now+=ms,now:()=>now,account:id=>{account=id;}};
+ const heartbeat=()=>service.observe('00000000-0000-4000-8000-000000000001',service.build,'obs-browser');heartbeat();
+ t.after(()=>{service.close();store.close();});return {store,service,advance:ms=>{now+=ms;heartbeat();},now:()=>now,account:id=>{account=id;}};
 }
 test('badges default on for existing/new people, persist per account without changing people/history/cooldowns',async t=>{
  const f=fixture(t),before=f.store.people('123');f.store.observeShoutout('123','alice',f.now()-5000);const stamp=f.store.last('123','alice');

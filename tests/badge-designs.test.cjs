@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {Store}=require('../core/store.cjs');
 const {Badges}=require('../core/badges/service.cjs');
 const {DESIGNS,PALETTES,DEFAULT_STYLE,style}=require('../core/badges/config.cjs');
-function fixture(t){const store=new Store(':memory:');store.rememberAccount('123','owner');store.add('alice');store.add('bob');const service=new Badges({store,account:()=> '123',port:0});t.after(()=>{service.close();store.close();});return {store,service};}
+function fixture(t){const store=new Store(':memory:');store.rememberAccount('123','owner');store.add('alice');store.add('bob');const service=new Badges({store,account:()=> '123',port:0});service.observe('00000000-0000-4000-8000-000000000001',service.build,'obs-browser');t.after(()=>{service.close();store.close();});return {store,service};}
 
 test('six designs have independent complete validated palettes',()=>{
   assert.deepEqual(DESIGNS.map(d=>d.id),['air','pass','sticker','terminal','ticket','frame','custom']);

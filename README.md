@@ -1,5 +1,7 @@
 # Shoutout Desk OBS
 
+**0.6.1:** all badge designs wait for a compatible source heartbeat. A brief disconnect retains fresh queued badges for up to two minutes; outdated pages reload automatically. An unloaded or crashed OBS browser still requires reactivation. Saved profiles and source URLs are unchanged.
+
 **0.6.0: Custom HTML/CSS badges.** The seventh design provides variables, live preview, HTML/CSS editors and a copyable AI brief. Use common or per-streamer templates without changing the six presets or existing data. Fully restart OBS after updating. [Template contract](docs/custom-badges.md).
 
 **0.5.0: Raid priority, repeat raid shoutouts within Twitch limits and six customizable badge designs.**

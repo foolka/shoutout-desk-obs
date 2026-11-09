@@ -13,9 +13,10 @@ class Badges {
     this.overlayToken=store.meta('badges:overlayToken','');
     if(!/^[a-f0-9]{64}$/.test(this.overlayToken)){this.overlayToken=randomBytes(32).toString('hex');store.setMeta('badges:overlayToken',this.overlayToken);}
     this.cache=new Map();this.queue=[];this.current=null;this.pending=Promise.resolve();this.closed=false;
+    this.clients=new Map();
     const hash=createHash('sha256');
     for(const file of ['overlay.html','overlay.js','render.js','custom-render.js','custom-template.js','badge.css','stamp-ink.png'])hash.update(fs.readFileSync(path.join(__dirname,'web',file)));
-    hash.update(fs.readFileSync(PURIFY));this.build=hash.digest('hex');this.compatibleSeen=-Infinity;
+    hash.update(fs.readFileSync(PURIFY));this.build=hash.digest('hex');
   }
   config(account=this.account()){
     const value=this.store.meta('badges:config:'+account,{});
@@ -30,7 +31,20 @@ class Badges {
     else {if(typeof body.enabled!=='boolean')throw Error('Некорректный переключатель.');config.enabled=body.enabled;config.style=style(body.style,config.style);}
     this.store.setMeta('badges:config:'+this.account(),config);this.onChange();return this.view();
   }
-  info(){return {ready:!!this.server?.listening,error:this.error||'',width:WIDTH,height:HEIGHT,url:this.server?.listening?this.origin+'/overlay/'+this.overlayToken:''};}
+  // A browser heartbeat proves that a compatible renderer is still connected.
+  health(){
+    for(const [id,client] of this.clients)if(this.now()-client.seen>=12000)this.clients.delete(id);
+    const clients=[...this.clients.values()];
+    return {clients:clients.filter(c=>c.build===this.build).length,obsClients:clients.filter(c=>c.obs&&c.build===this.build).length,outdated:clients.some(c=>c.obs&&c.build!==this.build)};
+  }
+  observe(client,build,userAgent){
+    this.health();
+    if(!/^[a-f0-9-]{36}$/.test(client||'')||typeof build!=='string'||build.length!==64)return;
+    if(this.clients.size>=32&&!this.clients.has(client))return;
+    this.clients.set(client,{seen:this.now(),build,obs:/obs-browser|OBS(?:Studio)?\//i.test(userAgent||'')});
+  }
+  info(){return {ready:!!this.server?.listening,error:this.error||'',width:WIDTH,height:HEIGHT,url:this.server?.listening?this.origin+'/overlay/'+this.overlayToken:'',...this.health(),queued:this.queue.length};}
+  playing(){return this.health().obsClients>0&&this.current?.endsAt>this.now();}
   editor(login=''){if(!this.server?.listening)throw Error(this.error||'Источник ещё запускается.');return this.origin+'/editor#'+new URLSearchParams({key:this.adminToken,login}).toString();}
   view(){return {...this.info(),account:this.account(),config:this.config(),people:this.store.people(this.account()).map(p=>({login:p.login,...this.rule(p.login)})),effects:EFFECTS,exitEffects:EFFECTS,fonts:FONTS,designs:DESIGNS,paletteDefaults:PALETTES,paletteFields:PALETTE_FIELDS,defaults:DEFAULT_STYLE};}
   async identity(login){
@@ -53,6 +67,7 @@ class Badges {
   }
   async test(login,account=this.account()){
     login=normalizeLogin(login);if(account!==this.account()||!this.member(login))throw Error('Выберите стримера из списка.');
+    this.frame();
     if(this.queue.filter(x=>x.test).length>=5)throw Error('Дождитесь завершения тестовых плашек.');
     await this.enqueue(login,true,account);return {ok:true};
   }
@@ -61,18 +76,18 @@ class Badges {
     if(this.closed||account!==this.account()||!this.member(login,account))return;
     const config=this.config(account),rule=this.rule(login,account);
     if(!test&&(!config.enabled||!rule.enabled))return;
+    this.frame();
     if(this.queue.length>=30)return;
     this.queue.push({...identity,account,test,description:rule.description,style:rule.custom?rule.style:config.style,id:randomUUID(),queuedAt:this.now()});this.frame();
   }
   allowed(item){return item.account===this.account()&&this.member(item.login,item.account)&&(item.test||(this.config().enabled&&this.rule(item.login).enabled));}
   frame(){
     const now=this.now();
+    this.queue=this.queue.filter(item=>now-item.queuedAt<=120000&&this.allowed(item));
     if(this.current&&(now>=this.current.endsAt||!this.allowed(this.current)))this.current=null;
-    if(!this.current){
+    if(!this.current&&this.health().clients>0){
       let next;while((next=this.queue[0])){
         if(!this.allowed(next)||now-next.queuedAt>120000){this.queue.shift();continue;}
-        // A legacy source cannot render custom HTML; retain its event until a compatible page connects.
-        if(next.style.design==='custom'&&now-this.compatibleSeen>=12000)break;
         this.queue.shift();this.current={...next,startsAt:now,endsAt:now+next.style.duration*1000+950};break;
       }
     }
@@ -96,8 +111,8 @@ class Badges {
     const url=new URL(req.url,this.origin),route=url.pathname;
     if(req.headers.origin&&req.headers.origin!==this.origin)return this.json(res,403,{error:'Чужой источник запроса.'});
     if(route==='/api/view/'+this.overlayToken&&req.method==='GET'){
-      if(url.searchParams.get('build')===this.build)this.compatibleSeen=this.now();
-      else return this.json(res,200,{now:this.now(),event:this.current?.style.design==='custom'?null:this.current,build:this.build});
+      this.observe(url.searchParams.get('client'),url.searchParams.get('build'),req.headers['user-agent']);
+      if(url.searchParams.get('build')!==this.build)return this.json(res,200,{now:this.now(),event:null,build:this.build});
       return this.json(res,200,this.frame());
     }
     if(route.startsWith('/api/')){
@@ -118,6 +133,6 @@ class Badges {
     res.writeHead(200,{'Content-Type':type+'; charset=utf-8'});
     const bytes=fs.readFileSync(path.join(__dirname,'web',file));res.end(file==='overlay.html'?bytes.toString('utf8').replace('SHOUTOUT_BADGE_BUILD',this.build):bytes);
   }
-  close(){this.closed=true;clearInterval(this.timer);this.queue=[];this.current=null;this.server?.closeAllConnections();this.server?.close();}
+  close(){this.closed=true;clearInterval(this.timer);this.queue=[];this.current=null;this.clients.clear();this.server?.closeAllConnections();this.server?.close();}
 }
 module.exports={Badges,WIDTH,HEIGHT};

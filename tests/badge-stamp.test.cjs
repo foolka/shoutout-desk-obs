@@ -29,6 +29,7 @@ test('personal and common stamps save independently and do not modify history or
   const rows=()=>JSON.stringify({people:store.people('123'),history:store.displayHistory('123')});const before=rows();
   service.save({account:'123',enabled:true,style:{...DEFAULT_STYLE,stampPosition:'bottom-left',stampColor:'#123456',stampText:'АВТОР'}});
   service.save({account:'123',login:'alice',person:{enabled:true,custom:true,description:'Still here',style:{...DEFAULT_STYLE,stampEnabled:false,stampAngle:35,stampSize:200,stampFontSize:30}}});
+  service.observe('00000000-0000-4000-8000-000000000001',service.build,'obs-browser');
   assert.equal(rows(),before);await service.test('alice');assert.equal(service.frame().event.style.stampEnabled,false);
   assert.equal(service.rule('bob').style.stampText,'АВТОР');assert.equal(service.rule('bob').style.stampPosition,'bottom-left');
   const reopened=new Badges({store,account:()=> '123'});t.after(()=>reopened.close());assert.equal(reopened.rule('alice').description,'Still here');assert.equal(reopened.rule('alice').style.stampSize,200);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1 - 2026-11-09
+
+- Require a recent compatible source heartbeat before starting any badge design, not only custom HTML. Expire disconnected renderers after 12 seconds and retain fresh queued badges for up to two minutes.
+- Reload outdated version-aware pages without dispatching to them. Keep stable source URLs, people, descriptions, history and Twitch cooldowns unchanged.
+- Verify source disconnect/reconnect, old-open-page reload, queue limits and profile preservation with isolated tests.
+
 ## 0.6.0 - 2026-11-08
 
 - Add a seventh badge mode: custom HTML/CSS with a live preview, variable reference, starter template and copyable AI brief.

@@ -39,7 +39,7 @@ let browser;
 	await page.locator('#designs [data-design=air]').click();await page.locator('#designs [data-design=custom]').click();assert((await page.locator('#custom-html').inputValue()).includes('my-badge'));
 	const overlay=await context.newPage();await overlay.setViewportSize({width:560,height:560});await overlay.goto(service.info().url);
 	// Change the protocol hash while the old source page stays open.
-	service.build='f'.repeat(64);service.compatibleSeen=-Infinity;
+	service.build='f'.repeat(64);
 	await service.test('friend');assert.equal(service.current,null);assert.equal(service.queue.length,1);
 	await overlay.frameLocator('iframe').locator('.my-badge').waitFor();
 	assert.equal(await overlay.locator('meta[name=badge-build]').getAttribute('content'),service.build);
