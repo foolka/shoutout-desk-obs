@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 - 2026-11-11
+
+- The dock pauses startup for an ambiguous or missing profile. Review paths and record counts in the dock without interrupting OBS. Current and portable OBS profiles remain separate from the desktop app.
+- Restore a selected database copy only when the destination is absent and there are no orphan journals. Existing databases are never replaced.
+- Include personal descriptions and designs in channel export/import; prefer current badge settings on conflicts.
+
 ## 0.6.1 - 2026-11-09
 
 - Require a recent compatible source heartbeat before starting any badge design, not only custom HTML. Expire disconnected renderers after 12 seconds and retain fresh queued badges for up to two minutes.

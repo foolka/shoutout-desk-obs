@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QLabel>
+#include <QMessageBox>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QTabWidget>
@@ -84,6 +85,19 @@ public:
         missing.dataRoot=data;missing.loadLanguage();missing.command("reconnect");
         require(wait([&]{return missing.workerReady;}),"Repair/reconnect did not recover");
         missing.stop();
+        QTemporaryDir old;
+        const auto oldFile=old.path()+"/previous.sqlite";
+        require(QFile::copy(profile.path()+"/shoutouts.sqlite",oldFile),"Cannot seed recovery copy");
+        ShoutoutDock review(data,old.path(),true);review.setAttribute(Qt::WA_DontShowOnScreen);review.show();
+        require(wait([&]{return !review.profileReview.isEmpty();}),"Missing profile did not enter recovery");
+        require(!review.workerReady&&!QFileInfo::exists(old.path()+"/shoutouts.sqlite"),"Recovery silently started a fresh database");
+        review.workerLastReply=0;review.checkWorker();
+        require(review.worker->state()==QProcess::Running,"Recovery was interrupted by the watchdog");
+        review.profileReviewButton->click();
+        auto box=review.findChild<QMessageBox*>();
+        require(box&&box->text().contains("previous.sqlite"),"Recovery dialog did not identify the stored copy");
+        box->reject();
+        review.stop();require(!review.workerRetryTimer->isActive(),"Review shutdown retried");
         std::puts("PASS: worker crash/heartbeat recovery, retained pause/data, shutdown, missing-file repair, localized narrow/wide queue");
     }
 };

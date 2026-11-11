@@ -41,7 +41,25 @@ async function main() {
   const args=process.argv.slice(2), dir=path.resolve(args[0]||''), helper=path.resolve(args[1]||'');
   if(!path.isAbsolute(args[0]||'')||!path.isAbsolute(args[1]||''))throw Error('Absolute profile and helper paths are required.');
   const demo=args.includes('--offline-demo'),recover=args.includes('--recover-worker');
-  phase='backup';await prepareProfile(dir,VERSION);phase='database';
+  let reviewInput;
+  const flag=name=>args.find(arg=>arg.startsWith(name+'='))?.slice(name.length+1);
+  const ask=view=>new Promise(resolve=>{
+    if(!reviewInput)reviewInput=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
+    const exit=()=>process.exit(0);
+    const receive=line=>{
+      let request;try{request=JSON.parse(line);}catch{return;}
+      if(request.method==='quit')return exit();
+      if(request.method!=='profileChoice')return;
+      reviewInput.off('line',receive);reviewInput.off('close',exit);
+      resolve(request.params||{});
+    };
+    reviewInput.on('line',receive);reviewInput.once('close',exit);
+    process.stdout.write(JSON.stringify({event:'profileReview',view})+'\n');
+  });
+  phase='backup';
+  try{await prepareProfile(dir,VERSION,{alternatives:demo?[]:[flag('--standard-profile'),flag('--portable-profile')],confirmFresh:!demo,locale:flag('--locale'),ask});}
+  catch(error){if(error.code==='PROFILE_CANCELLED'){reviewInput?.close();return;}throw error;}
+  phase='database';
   const store=new Store(path.join(dir,'shoutouts.sqlite'),Date.now,{resumeQueue:recover});
   const diagnostics=new Diagnostics(dir);
   // The checkbox pauses only this OBS session; startup never resets cooldowns.
@@ -188,7 +206,7 @@ async function main() {
     try{await active.refresh();}catch(error){if(active===engine){notice=safeError(error);bridge.reset();changed();}}
     finally{refreshing=false;}
   },30000);
-  const input=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
+  const input=reviewInput||readline.createInterface({input:process.stdin,crlfDelay:Infinity});
   let chain=Promise.resolve();
   input.on('line',line=>{
     if(line.length>1024*1024)return shutdown();

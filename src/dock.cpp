@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -135,6 +136,8 @@ void ShoutoutDock::build(){
     enabled=new QCheckBox(t("enabled"));enabled->setEnabled(false);account->addWidget(enabled);
     connect(enabled,&QCheckBox::toggled,this,[this](bool checked){if(!painting)command("prefs",{{"enabled",checked}});});root->addLayout(account);
     notice=label({},"notice");notice->hide();root->addWidget(notice);
+    profileReviewButton=button({},"folder-open");profileReviewButton->hide();root->addWidget(profileReviewButton);
+    connect(profileReviewButton,&QPushButton::clicked,this,[this]{showProfileReview();});
     updateBanner=button({},"download");updateBanner->hide();root->addWidget(updateBanner);
     connect(updateBanner,&QPushButton::clicked,this,[this]{openUrl(state.value("update").toObject().value("url").toString());});
     tabs=new QTabWidget;tabs->setObjectName("tabs");root->addWidget(tabs,1);
@@ -310,6 +313,11 @@ void ShoutoutDock::startWorker(){
     if(worker){worker->disconnect(this);worker->deleteLater();}
     worker=new QProcess(this);worker->setProgram(dataRoot+"/runtime/node.exe");
     QStringList args{"--disable-warning=ExperimentalWarning",dataRoot+"/worker.cjs",profileRoot,dataRoot+"/shoutout-secure.exe"};if(preview)args<<"--offline-demo";
+    args<<"--locale="+language;
+    if(!preview){
+        args<<"--standard-profile="+QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)+"/Shoutout Desk OBS";
+        args<<"--portable-profile="+QDir(QCoreApplication::applicationDirPath()+"/../../config/shoutout-desk-obs").absolutePath();
+    }
     if(workerInitialized)args<<"--recover-worker";
     worker->setArguments(args);worker->setWorkingDirectory(dataRoot);
     auto env=QProcessEnvironment::systemEnvironment();env.remove("NODE_OPTIONS");env.remove("NODE_PATH");worker->setProcessEnvironment(env);
@@ -339,7 +347,7 @@ void ShoutoutDock::workerFailed(const QString &message,const QString &reason,int
     }else showError(message+"\n"+t("workerRetryHelp"));
 }
 void ShoutoutDock::checkWorker(){
-    if(stopped||!worker||worker->state()!=QProcess::Running)return;
+    if(stopped||!profileReview.isEmpty()||!worker||worker->state()!=QProcess::Running)return;
     const auto now=QDateTime::currentMSecsSinceEpoch();
     if(now-workerLastReply>(workerReady?45000:90000)){workerProblem=t("workerHung");worker->kill();return;}
     if(workerReady&&now-workerStartedAt>=60000)workerRestarts=0;
@@ -364,7 +372,13 @@ void ShoutoutDock::readWorker(){
         auto line=buffer.left(pos);buffer.remove(0,pos+1);auto message=QJsonDocument::fromJson(line).object();
         if(message.isEmpty())continue;
         workerLastReply=QDateTime::currentMSecsSinceEpoch();
-        if(message.value("event")=="state"){
+        if(message.value("event")=="profileReview"){
+            profileReview=message.value("view").toObject();
+            profileReviewButton->setText(profileReview.value("title").toString());profileReviewButton->show();
+            connection->setText(profileReview.value("title").toString());notice->hide();
+            if(awaitingReviewReply){awaitingReviewReply=false;QTimer::singleShot(0,this,[this]{showProfileReview();});}
+        }else if(message.value("event")=="state"){
+            awaitingReviewReply=false;profileReview={};profileReviewButton->hide();
             workerReady=true;workerInitialized=true;workerProblem.clear();workerRetryTimer->stop();
             state=message.value("data").toObject();
             if(state.value("notice").toString().isEmpty())notice->hide();
@@ -386,6 +400,32 @@ void ShoutoutDock::readWorker(){
     }
 }
 void ShoutoutDock::showError(const QString &message){notice->setText(message);notice->show();}
+// Recovery is opened by the streamer, never by a modal dialog during OBS startup.
+void ShoutoutDock::showProfileReview(){
+    if(profileReview.isEmpty()||!worker)return;
+    const auto view=profileReview,actions=view.value("actions").toObject();
+    auto box=new QMessageBox(QMessageBox::Information,view.value("title").toString(),view.value("detail").toString(),QMessageBox::NoButton,this);
+    box->setTextFormat(Qt::PlainText);box->setAttribute(Qt::WA_DeleteOnClose);
+    QHash<QAbstractButton*,QString> keys;
+    for(const auto &k:{"keep","create","restore","browse","folder","close"})if(actions.contains(k)){
+        auto b=box->addButton(actions.value(k).toString(),QString(k)=="close"?QMessageBox::RejectRole:QMessageBox::ActionRole);
+        keys.insert(b,k);if(QString(k)=="close"){box->setDefaultButton(b);box->setEscapeButton(b);}
+    }
+    profileReviewButton->setEnabled(false);
+    connect(box,&QDialog::finished,this,[this]{profileReviewButton->setEnabled(true);});
+    connect(box,&QMessageBox::buttonClicked,this,[this,keys,view,actions](QAbstractButton *b){
+        const auto k=keys.value(b);
+        if(k.isEmpty()||k=="close")return;
+        if(k=="folder"){QDesktopServices::openUrl(QUrl::fromLocalFile(profileRoot));return;}
+        QJsonObject params{{"action",k}};
+        if(k=="browse"){
+            const auto f=QFileDialog::getOpenFileName(this,actions.value(k).toString(),view.value("initial").toString());
+            if(f.isEmpty())return;params.insert("file",f);
+        }
+        if(worker){awaitingReviewReply=true;worker->write(QJsonDocument(QJsonObject{{"method","profileChoice"},{"params",params}}).toJson(QJsonDocument::Compact)+'\n');}
+    });
+    box->open();
+}
 void ShoutoutDock::checkAuthNotice(){
     const auto auth=state.value("auth").toObject();
     const bool required=state.value("prefs").toObject().value("provider").toString()!="bot"&&auth.value("reauthRequired").toBool();

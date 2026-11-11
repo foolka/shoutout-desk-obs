@@ -1,10 +1,26 @@
 const {normalizeLogin} = require('./store.cjs');
 const {DatabaseSync} = require('node:sqlite');
+const {style,person}=require('./badges/config.cjs');
+
+// Import presentation only; source keys and authentication never belong in exports.
+function mergeBadges(saved, incoming) {
+  if(!incoming || typeof incoming!=='object' || typeof incoming.enabled!=='boolean' || !incoming.people || typeof incoming.people!=='object'||Array.isArray(incoming.people))throw Error('Некорректный импорт бейджиков.');
+  const theme=style(incoming.style), entries=Object.entries(incoming.people);
+  if(entries.length>100000)throw Error('Слишком много бейджиков.');
+  const people=Object.assign(Object.create(null),saved?.people);
+  for(const [name,item] of entries){
+    if(normalizeLogin(name)!==name)throw Error('Некорректный ник бейджика.');
+    const badge=person(item,theme);
+    if(!Object.hasOwn(people,name))people[name]=badge;
+  }
+  return {...(saved||{enabled:incoming.enabled,style:theme}),people};
+}
 
 function exportBundle(store, account) {
   return {
     format:'shoutout-desk-obs', version:1, exportedAt:store.now(),
     account:{id:account, channel:store.lastAccount().channel},
+    badges:store.meta('badges:config:'+account,null),
     cooldownHours:store.prefs().cooldownHours,
     cooldownResetAt:store.cooldownResetAt(account),
     people:store.db.prepare('SELECT login,added_at,active FROM channel_people WHERE account=?').all(account),
@@ -22,6 +38,7 @@ function readDesktop(file) {
     if(db.prepare('PRAGMA user_version').get().user_version>3)throw Error('База из более новой версии. Сначала обновите приложение.');
     return {
       format:'shoutout-desk-obs', version:1, account,
+      badges:JSON.parse(db.prepare('SELECT value FROM preferences WHERE key=?').get('badges:config:'+account.id)?.value||'null'),
       cooldownHours:JSON.parse(db.prepare("SELECT value FROM preferences WHERE key='cooldownHours'").get()?.value || '24'),
       cooldownResetAt:JSON.parse(db.prepare('SELECT value FROM preferences WHERE key=?').get('cooldownReset:'+account.id)?.value || '0'),
       people:tables.has('channel_people')?db.prepare("SELECT login,added_at,active FROM channel_people WHERE account=? OR account=''").all(account.id):db.prepare('SELECT login,added_at,active FROM people').all(),
@@ -56,6 +73,7 @@ function importBundle(store, value, account) {
   const resetAt=value.cooldownResetAt==null||value.cooldownResetAt===0?0:stamp(value.cooldownResetAt);
   store.db.exec('BEGIN IMMEDIATE');
   try {
+    if(value.badges!=null)store.setMeta('badges:config:'+account,mergeBadges(store.meta('badges:config:'+account,null),value.badges));
     for (const p of people) store.db.prepare('INSERT INTO channel_people VALUES (?,?,?,?) ON CONFLICT(account,login) DO UPDATE SET active=MAX(active,excluded.active),added_at=MIN(added_at,excluded.added_at)').run(account,p.login,p.added_at,p.active);
     for (const a of attempts) store.db.prepare('INSERT OR IGNORE INTO attempts(id,account,login,created_at,started_at,finished_at,status,detail,trigger) VALUES (?,?,?,?,?,?,?,?,?)').run(a.id,account,a.login,a.created_at,a.started_at,a.finished_at,a.status,a.detail,a.trigger);
     for (const o of observed) store.db.prepare('INSERT OR IGNORE INTO observed_shoutouts VALUES (?,?,?)').run(account,o.login,o.stamp);

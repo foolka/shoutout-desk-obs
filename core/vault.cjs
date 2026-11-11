@@ -42,8 +42,9 @@ async function backupProfile(dir, reason) {
   return target;
 }
 
-async function prepareProfile(dir, version) {
+async function prepareProfile(dir, version, options={}) {
   fs.mkdirSync(dir, {recursive:true});
+  await require('./profile-review.cjs').guard(dir,{...options,write:atomicWrite});
   const marker = path.join(dir, 'profile-version.json');
   let previous;
   if (fs.existsSync(marker)) {
